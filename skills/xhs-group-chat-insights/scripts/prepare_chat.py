@@ -16,6 +16,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 from xhs_ext.private_paths import ensure_private_dir
+from xhs_ext.group_chat_exporter import safe_csv_value
 
 
 TEXT_TYPES = {0, 1, 3, 8, 14}
@@ -201,7 +202,7 @@ def main() -> int:
     with output_csv.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames)
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows({key: safe_csv_value(value) for key, value in row.items()} for row in rows)
     os.chmod(output_csv, 0o600)
 
     human_text = [

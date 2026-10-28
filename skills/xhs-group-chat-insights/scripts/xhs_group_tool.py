@@ -16,7 +16,7 @@ from pathlib import Path
 from xhs_ext.private_paths import ensure_private_dir
 
 
-TESTED_SPIDER_COMMIT = "7077c88f82771f547cc1afdadaec4025be2355e6"
+TESTED_SPIDER_COMMIT = "23dab803a0465e35e01cf87137353a900b47e93d"
 DEFAULT_SPIDER_ROOT = Path.home() / ".local" / "share" / "xhs-group-chat-insights" / "Spider_XHS"
 DEFAULT_COOKIE_FILE = Path.home() / ".config" / "xhs-group-chat-insights" / "xhs-cookie.txt"
 
@@ -271,6 +271,7 @@ def cmd_login_qr(args: argparse.Namespace) -> int:
     os.environ["NODE_PATH"] = str(root / "node_modules")
 
     from apis.xhs_pc_login_apis import XHSLoginApi
+    from xhs_ext.login_diagnostics import LoginDiagnostics
     import qrcode
 
     target = cookie_path(args.cookie_file)
@@ -282,19 +283,23 @@ def cmd_login_qr(args: argparse.Namespace) -> int:
     if qr_file.exists() and not args.overwrite:
         raise FileExistsError(f"QR file exists; use --overwrite: {qr_file}")
     login = XHSLoginApi()
+    diagnostic = LoginDiagnostics(login)
     qr_touched = False
     try:
         cookies = login.generate_init_cookies()
+        diagnostic.set_stage("generating_qr")
         ok, message, qr_data = login.generate_qrcode(cookies)
         if not ok:
             raise RuntimeError(f"QR generation failed: {message}")
         cookies = qr_data["cookies"]
 
+        diagnostic.set_stage("preflight")
         ok, status, cookies = login.check_qrcode_status(
             qr_data["qr_id"], qr_data["code"], cookies
         )
         if ok or status != "请扫描二维码":
             raise RuntimeError(f"QR preflight failed: {status}")
+        diagnostic.set_stage("preparing_web_profile")
         login.ensure_webprofile(cookies)
 
         private_dir(qr_file.parent)
@@ -306,17 +311,20 @@ def cmd_login_qr(args: argparse.Namespace) -> int:
         print(f"qr_file={qr_file}", flush=True)
         print("status=waiting_for_scan", flush=True)
 
+        diagnostic.set_stage("waiting_for_scan")
         deadline = time.monotonic() + args.timeout
         while time.monotonic() < deadline:
             ok, status, cookies = login.check_qrcode_status(
                 qr_data["qr_id"], qr_data["code"], cookies
             )
             if ok:
+                diagnostic.set_stage("verifying_session")
                 valid, user_info, cookies = login.get_user_info(cookies)
                 if not valid or user_info.get("guest") is not False:
                     raise RuntimeError(
                         "QR confirmation did not produce an authenticated session"
                     )
+                diagnostic.set_stage("saving_credentials")
                 write_private(
                     target,
                     login.cookies_to_str(cookies) + "\n",
@@ -326,8 +334,12 @@ def cmd_login_qr(args: argparse.Namespace) -> int:
                 return 0
             if "过期" in str(status):
                 raise RuntimeError("QR code expired")
+            diagnostic.set_stage("waiting_for_confirmation" if status == "请确认登录" else "waiting_for_scan")
             time.sleep(2)
         raise TimeoutError("timed out waiting for QR scan")
+    except Exception as error:
+        diagnostic.failed(error)
+        raise
     finally:
         try:
             login.close()
@@ -335,7 +347,7 @@ def cmd_login_qr(args: argparse.Namespace) -> int:
             if qr_touched:
                 try:
                     qr_file.unlink()
-                except FileNotFoundError:
+                except OSError:
                     pass
 
 
@@ -409,6 +421,12 @@ def cmd_group_chat(args: argparse.Namespace) -> int:
         )
     finally:
         api.close()
+
+    if args.update and not state["completed"]:
+        raise RuntimeError(
+            "Incremental update reached the page limit before reconnecting to saved history; "
+            "existing files were preserved. Increase --max-pages and retry."
+        )
 
     state["pages_fetched"] += prior_pages
     if args.update:

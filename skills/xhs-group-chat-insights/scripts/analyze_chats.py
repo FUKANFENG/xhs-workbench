@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from xhs_ext.private_paths import ensure_private_dir
+from xhs_ext.group_chat_exporter import safe_csv_value
 
 
 TEXT_TYPES = {"0", "1", "3", "8", "14"}
@@ -72,7 +73,7 @@ def write_csv(path: Path, fieldnames: list[str], rows: list[dict[str, Any]]) -> 
     with path.open("w", encoding="utf-8-sig", newline="") as handle:
         writer = csv.DictWriter(handle, fieldnames=fieldnames, extrasaction="ignore")
         writer.writeheader()
-        writer.writerows(rows)
+        writer.writerows({key: safe_csv_value(value) for key, value in row.items()} for row in rows)
     os.chmod(path, 0o600)
 
 

@@ -75,6 +75,8 @@ def cookie_file_is_private(cookie_file: Path) -> bool:
 
 def extract_message_list(response_json: dict) -> List[dict]:
     data = (response_json or {}).get("data") or {}
+    if not isinstance(data, dict) or "out_message_list" not in data:
+        raise ValueError("history response is missing data.out_message_list")
     messages = data.get("out_message_list") or []
     if not isinstance(messages, list):
         raise ValueError("data.out_message_list is not a list")
@@ -225,12 +227,18 @@ def fetch_group_history(
     }
 
 
+def safe_csv_value(value):
+    if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+        return "'" + value
+    return value
+
+
 def _json_value(value):
     if isinstance(value, (dict, list)):
         return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
     if value is None:
         return ""
-    return value
+    return safe_csv_value(value)
 
 
 def csv_columns(messages: Iterable[dict]) -> List[str]:

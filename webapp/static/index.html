@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>群聊洞察 · 本地工作台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#workspace">跳到工作台</a>
+<aside class="sidebar">
+  <a class="brand" href="#workspace"><span class="brand-mark">群</span><span>群聊洞察<small>本地工作台</small></span></a>
+  <nav aria-label="主导航">
+    <a class="nav-link active" href="#workspace"><span aria-hidden="true">▦</span> 工作台</a>
+    <a class="nav-link" href="#records"><span aria-hidden="true">▤</span> 群记录</a>
+    <a class="nav-link" href="#guide"><span aria-hidden="true">?</span> 使用说明</a>
+  </nav>
+  <div class="sidebar-note"><span class="local-dot"></span> 仅在这台电脑运行<p>指定群 · 只读采集<br>记录保存在本机</p></div>
+</aside>
+<main id="workspace">
+  <header class="topbar"><span class="eyebrow">XHS GROUP INSIGHTS</span><span id="service-badge" class="badge">正在连接本地服务…</span></header>
+  <section class="page-intro"><div><p class="eyebrow red">采集 / 整理 / 回看</p><h1>群记录工作台</h1><p>把指定群的讨论保存下来，持续更新，随时查阅。</p></div><span class="version">LOCAL · 1.0</span></section>
+  <section class="stats" aria-label="记录概览">
+    <div><span>已保存群</span><strong id="stat-groups">0</strong><small>指定范围，逐群整理</small></div>
+    <div><span>已保存消息</span><strong id="stat-messages">0</strong><small>保留原文与引用关系</small></div>
+    <div><span>定时更新</span><strong id="stat-monitor" class="stat-word">未开启</strong><small id="monitor-hint">完成首次采集后可开启</small></div>
+  </section>
+  <div class="workspace-grid">
+    <section class="panel capture-panel" aria-labelledby="capture-heading">
+      <div class="panel-heading"><div><span class="step">01</span><h2 id="capture-heading">采集指定群</h2></div><span class="subtle">只读取你有权访问的群</span></div>
+      <form id="capture-form">
+        <label for="chat-url">群会话链接或群 ID</label>
+        <input id="chat-url" name="chat_url" required maxlength="512" placeholder="https://www.xiaohongshu.com/chat/…" autocomplete="off">
+        <p class="field-hint">从小红书网页版的群会话地址复制，也可以填写纯数字群 ID。</p>
+        <div class="form-grid"><div><label for="group-name">群备注 <span class="optional">可选</span></label><input id="group-name" maxlength="80" placeholder="例如：内容运营交流群"></div><div><label for="max-pages">本次最多采集</label><select id="max-pages"><option value="20">20 页 · 约 600 条</option><option value="100" selected>100 页 · 约 3,000 条</option><option value="500">500 页 · 约 15,000 条</option><option value="1000">1,000 页 · 约 30,000 条</option></select></div></div>
+        <div class="actions"><button id="capture-full" class="button primary" type="submit">首次采集 <span aria-hidden="true">↗</span></button><button id="capture-update" class="button" type="button">获取新增消息</button><button id="capture-resume" class="text-button" type="button">继续历史采集</button></div>
+      </form>
+      <div class="task-area"><div class="section-label">最近任务 <button id="cancel-job" class="text-button danger" hidden>取消任务</button></div><div id="job-status" class="job-status" role="status" aria-live="polite"><span class="job-icon" aria-hidden="true">↳</span><div><strong>准备就绪</strong><p>扫码登录后，填写群链接开始第一次采集。</p></div></div><ol id="job-logs" class="job-logs"></ol></div>
+    </section>
+    <section class="panel login-panel" aria-labelledby="login-heading"><div class="panel-heading"><div><span class="step">02</span><h2 id="login-heading">连接小红书</h2></div></div><div class="login-state"><span id="login-indicator" class="state-dot"></span><strong id="login-state">等待扫码登录</strong></div><div id="qr-box" class="qr-box"><div id="qr-placeholder"><svg width="64" height="64" viewBox="0 0 64 64" fill="none" aria-hidden="true"><path d="M8 25V8h17M39 8h17v17M56 39v17H39M25 56H8V39" stroke="currentColor" stroke-width="3"/><path d="M17 17h9v9h-9zM38 17h9v9h-9zM17 38h9v9h-9zM38 38h5v5h-5zM46 46h5v5h-5zM46 34h5v5h-5zM34 46h5v5h-5z" fill="currentColor"/></svg><p>生成二维码后<br>使用手机小红书扫码</p></div><img id="login-qr" alt="小红书登录二维码，请用手机小红书扫描" hidden></div><p id="login-message" class="login-message">账号凭据只保存在本机，不会显示在页面中。</p><button id="login-button" class="button full-width">生成登录二维码</button></section>
+  </div>
+  <section class="panel records-panel" id="records" aria-labelledby="records-heading"><div class="panel-heading"><div><span class="step">03</span><h2 id="records-heading">群记录</h2></div><span id="record-range" class="subtle">采集后会显示在这里</span></div><div class="records-toolbar"><div class="select-group"><label class="sr-only" for="saved-group">选择已保存的群</label><select id="saved-group"><option value="">选择已保存的群</option></select></div><div class="search-box"><label class="sr-only" for="search">搜索消息或昵称</label><span aria-hidden="true">⌕</span><input id="search" type="search" maxlength="200" placeholder="搜索消息或昵称"></div><div class="download-actions"><button id="download-csv" class="button small">导出 CSV</button><button id="download-json" class="button small">导出 JSON</button></div></div><div id="record-empty" class="empty-state"><span class="empty-icon" aria-hidden="true">▤</span><h3>还没有群记录</h3><p>完成首次采集后，你可以在这里搜索消息、查看原文或导出文件。</p></div><div id="message-list" class="message-list" aria-live="polite"></div><div id="pagination" class="pagination" hidden><span id="record-total"></span><div><button id="page-prev" class="button small">上一页</button><span id="page-label">第 1 页</span><button id="page-next" class="button small">下一页</button></div></div></section>
+  <div class="bottom-grid"><section class="panel" aria-labelledby="monitor-heading"><div class="panel-heading"><div><h2 id="monitor-heading">定时获取新增消息</h2></div><span class="badge neutral" id="monitor-state">已暂停</span></div><p class="description">对当前选中的群定时执行增量更新。关闭网页后，本地服务仍会继续运行。</p><div class="monitor-controls"><label for="interval">更新间隔</label><select id="interval"><option value="5">每 5 分钟</option><option value="10" selected>每 10 分钟</option><option value="15">每 15 分钟</option><option value="30">每 30 分钟</option><option value="60">每小时</option></select><button id="monitor-button" class="button">开启定时更新</button></div><p id="monitor-detail" class="field-hint">发生采集错误时会自动暂停；服务重启后需手动开启。</p></section><section class="panel" aria-labelledby="analysis-heading"><div class="panel-heading"><div><h2 id="analysis-heading">话题与互动概览</h2></div><button id="analyze-button" class="text-button">生成分析 ↗</button></div><p class="description">按关键词整理聊天主题，并导出参与情况与讨论线索。</p><div id="analysis-empty" class="compact-empty">选择一个有记录的群，再生成话题分析。</div><div id="topic-list" class="topic-list"></div><div id="analysis-downloads" class="analysis-downloads" hidden><button class="text-button" data-download="topics">话题表 ↓</button><button class="text-button" data-download="participants">互动表 ↓</button><button class="text-button" data-download="events">讨论线索 ↓</button></div></section></div>
+  <section class="guide" id="guide"><h2>开始前，了解这三件事</h2><div class="guide-grid"><div><strong>先采集，再更新</strong><p>首次采集建立记录；“获取新增消息”补充最近的消息；“继续历史采集”向前补齐更早的记录。</p></div><div><strong>这是定时更新</strong><p>新消息会在下一轮更新时出现。页数不足时会停止并保留旧记录，可增加页数后重试。</p></div><div><strong>原文留在本机</strong><p>导出文件包含群内原文和成员信息。话题分析基于文字，不会自动识别图片或转写语音。</p></div></div></section>
+  <footer>基于 xhs-group-chat-insights · 本地只读工作台</footer>
+</main>
+<div id="toast" class="toast" role="alert" hidden></div>
+</body>
+</html>

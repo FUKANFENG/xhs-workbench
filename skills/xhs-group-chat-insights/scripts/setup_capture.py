@@ -16,7 +16,7 @@ from xhs_ext.private_paths import ensure_private_dir
 
 
 SPIDER_URL = "https://github.com/cv-cat/Spider_XHS.git"
-SPIDER_COMMIT = "7077c88f82771f547cc1afdadaec4025be2355e6"
+SPIDER_COMMIT = "23dab803a0465e35e01cf87137353a900b47e93d"
 DEFAULT_RUNTIME = Path.home() / ".local" / "share" / "xhs-group-chat-insights" / "Spider_XHS"
 DEFAULT_COOKIE = Path.home() / ".config" / "xhs-group-chat-insights" / "xhs-cookie.txt"
 
@@ -149,7 +149,7 @@ def main(argv: list[str] | None = None) -> int:
             str(Path(__file__).with_name("requirements-capture.txt")),
         ]
     )
-    run(["npm", "install"], cwd=root)
+    run([status["npm"], "ci"], cwd=root)
     run(
         [
             str(python),

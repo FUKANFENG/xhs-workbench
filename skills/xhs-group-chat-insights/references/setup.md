@@ -26,7 +26,7 @@ python3 <skill-dir>/scripts/setup_capture.py
 The script:
 
 - clones Spider_XHS into the user-local data directory;
-- checks out tested commit `7077c88f82771f547cc1afdadaec4025be2355e6`;
+- checks out locally verified runtime commit `23dab803a0465e35e01cf87137353a900b47e93d` (2026-10-22 login fixes; see `README_LOCAL.md` for the local deployment);
 - creates an isolated `.venv`;
 - installs the pinned checkout's Python and Node dependencies;
 - creates a private configuration directory without creating or exposing a Cookie.

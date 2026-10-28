@@ -10,11 +10,13 @@ import sys
 import threading
 import time
 import uuid
+import sqlite3
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .runtime import BusyError, JobRunner
 from .notes import NotesStore, valid_note_id
+from .note_schedule import NoteSchedule
 
 PROJECT = Path(__file__).resolve().parent.parent
 SCRIPTS = PROJECT / "skills" / "xhs-group-chat-insights" / "scripts"
@@ -57,6 +59,7 @@ class LocalService:
         self.media_root = Path(os.environ.get("XHS_MEDIA_ROOT", self.root / "runtime" / "MediaCrawler")).resolve()
         self.media_python = self.media_root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         self.note_requests: dict[str, Path] = {}
+        self.note_schedule = NoteSchedule(self)
 
     def notes_ready(self):
         return self.media_python.is_file() and (self.media_root / "media_platform/xhs/client.py").is_file()
@@ -71,7 +74,10 @@ class LocalService:
         mode = request["mode"]
         if mode == "comments" and not request["max_comments"]:
             raise ValueError("更新评论时，采集上限必须大于零。")
-        if mode == "search":
+        if mode == "creator":
+            from integration.notes_extra import parse_creator_url
+            parse_creator_url(request["url"])
+        elif mode == "search":
             request["keyword"] = request["keyword"].strip()
             if not request["keyword"]:
                 raise ValueError("请输入搜索关键词。")
@@ -92,7 +98,7 @@ class LocalService:
             command = [str(self.media_python), str(PROJECT / "integration/notes_worker.py"),
                        "--runtime", str(self.media_root), "--data", str(self.root), "--request", str(path)]
             try:
-                job = self.runner.start("notes_" + mode, {"search": "搜索笔记", "detail": "采集笔记与评论", "comments": "更新一级评论"}[mode],
+                job = self.runner.start("notes_" + mode, {"search": "搜索笔记", "detail": "采集笔记与评论", "comments": "更新评论", "creator": "采集作者作品", "media": "下载笔记媒体"}[mode],
                                         [command], timeout=900)
             except Exception:
                 path.unlink(missing_ok=True)
@@ -149,6 +155,7 @@ class LocalService:
             if self.runner.busy:
                 raise BusyError("已有任务正在执行，请等待完成或先取消。")
             self.monitor["enabled"] = False
+            self.notes.pause_monitors_for_restart()
             self.qr.unlink(missing_ok=True)
             return self.runner.start("login", "扫码登录", [command], timeout=210)
 
@@ -190,6 +197,7 @@ class LocalService:
     def finished(self, job: dict) -> None:
         with self.lock:
             if job["kind"].startswith("notes_"):
+                self.note_schedule.finished(job)
                 path = self.note_requests.pop(job["id"], None)
                 if path:
                     path.unlink(missing_ok=True)
@@ -226,6 +234,11 @@ class LocalService:
 
     def _schedule_loop(self) -> None:
         while not self.stop_event.wait(2):
+            try:
+                self.note_schedule.tick()
+            except sqlite3.Error:
+                # A temporary note-database lock must not kill group scheduling.
+                pass
             with self.lock:
                 monitor = dict(self.monitor)
             if not monitor["enabled"] or self.runner.busy or time.time() < (monitor["next_run"] or 0):

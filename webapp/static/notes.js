@@ -4,7 +4,7 @@
   const commentsView = location.pathname === "/comments";
   const selectedNote = commentsView ? (new URLSearchParams(location.search).get("note") || "") : "";
   const state = { token: "", status: null, revision: null, page: 1, size: 20, total: 0,
-    pending: false, request: 0, detail: "", detailRequest: 0, scope: null };
+    pending: false, request: 0, detail: "", detailRequest: 0, scope: null, creator: "", monitors: [], previewUrl: "" };
   let timer, filterTimer, toastTimer, polling = false;
   const node = (tag, className = "", text = "") => {
     const item = document.createElement(tag);
@@ -36,7 +36,7 @@
     const captureLabel = Number($("comment-limit").value) ? "采集详情与评论" : "采集笔记详情";
     $("link-submit").textContent = captureLabel;
     $("detail-capture").textContent = captureLabel;
-    document.querySelectorAll("[data-capture], #search-submit, #link-submit, #detail-capture").forEach(button => {
+    document.querySelectorAll("[data-capture], #search-submit, #link-submit, #detail-capture, #creator-submit, #detail-media, #detail-creator").forEach(button => {
       button.disabled = busy || !ready;
       if (button.dataset.capture && !button.dataset.detailed) button.textContent = captureLabel;
     });
@@ -68,7 +68,8 @@
     finally { state.pending = false; updateButtons(); }
   }
   function capture(id) {
-    return startJob({ mode: "detail", note_id: id, max_comments: Number($("comment-limit").value) });
+    return startJob({ mode: "detail", note_id: id, max_comments: Number($("comment-limit").value),
+      include_replies: $("include-replies").checked, max_replies: Number($("reply-limit").value) });
   }
   function noteRow(note) {
     const row = node("article", "note-row");
@@ -82,7 +83,7 @@
     heading.append(title, node("span", "note-label" + (note.detailed ? " full" : ""), note.detailed ? "已采集详情" : "搜索摘要"));
     const meta = node("div", "note-meta");
     meta.append(node("span", "", note.author || "作者未提供"), node("span", "", `赞 ${note.likes || 0}`),
-      node("span", "", `收藏 ${note.collects || 0}`), node("span", "", `本地一级评论 ${note.saved_comments}`));
+      node("span", "", `收藏 ${note.collects || 0}`), node("span", "", `本地评论与回复 ${note.saved_comments}`));
     if (note.source_keyword) meta.append(node("span", "", "来源：" + note.source_keyword));
     const actions = node("div", "note-actions");
     const collect = node("button", "button small", note.detailed ? "重新采集" : "采集详情与评论");
@@ -101,8 +102,9 @@
     const meta = node("div", "message-meta");
     meta.append(node("strong", "message-name", comment.author || "未提供昵称"), node("span", "message-time", date(comment.published_at)));
     const foot = node("div", "note-meta");
-    foot.append(node("span", "", `赞 ${comment.likes || 0}`), node("span", "", `回复 ${comment.reply_count || 0} · 未展开`));
+    foot.append(node("span", "", `赞 ${comment.likes || 0}`), node("span", "", comment.parent_id ? "二级回复" : `一级评论 · ${comment.reply_count || 0} 条回复`));
     row.append(meta, node("p", "comment-body", comment.content || "[非文字评论]"), foot);
+    if (comment.parent_id) row.append(node("blockquote", "quote", "回复的一级评论：" + (comment.parent_content || "未保存原文")));
     if (!selectedNote) {
       const link = node("a", "comment-note", "来自：" + (comment.note_title || "无标题笔记"));
       link.href = "/comments?note=" + encodeURIComponent(comment.note_id);
@@ -115,6 +117,7 @@
     $("notes-list").setAttribute("aria-busy", "true");
     const params = new URLSearchParams({ page: state.page, size: state.size, search: $("local-filter").value });
     if (selectedNote) params.set("note_id", selectedNote);
+    if (commentsView) params.set("level", $("comment-level").value);
     try {
       const data = await api((commentsView ? "/api/note-comments?" : "/api/notes?") + params);
       if (request !== state.request) return;
@@ -143,8 +146,9 @@
       const note = await api("/api/notes/" + encodeURIComponent(selectedNote));
       state.scope = note;
       $("scope-title").textContent = note.title || "无标题笔记";
-      $("scope-status").textContent = !note.comments_checked_at ? "尚未采集一级评论。" :
-        `上次采集：${date(note.comments_checked_at)} · 本次读取 ${note.last_scan_count} 条 · ${note.comments_complete ? "已读到本次分页末尾" : "达到采集上限，尚有更多评论"}。旧记录保留。`;
+      $("scope-status").textContent = (!note.comments_checked_at ? "尚未采集一级评论。" :
+        `上次采集：${date(note.comments_checked_at)} · 本次 ${note.last_scan_count} 条一级评论 · ${note.comments_complete ? "已读到分页末尾" : "达到采集上限"}。`) +
+        (note.replies_checked_at ? ` 回复采集：${date(note.replies_checked_at)}，本轮 ${note.last_reply_count} 条，${note.replies_complete ? "所选评论的回复已读完" : "达到回复上限"}。` : "尚未采集二级回复。") + "旧记录保留。";
     } catch (error) { $("scope-title").textContent = error.message; }
     finally { updateButtons(); }
   }
@@ -153,7 +157,10 @@
     try {
       const note = await api("/api/notes/" + encodeURIComponent(id));
       if (request !== state.detailRequest || (refresh && !$("note-detail").open)) return;
+      if (state.detail !== id) clearPreview();
       state.detail = id;
+      state.creator = /^[a-f0-9]{24}$/.test(note.creator_id || "") ? note.creator_id : "";
+      $("detail-creator").hidden = !state.creator;
       $("detail-title").textContent = note.title || "无标题笔记";
       $("detail-kind").textContent = note.detailed ? "已保存完整详情" : "搜索摘要";
       $("detail-meta").textContent = `${note.author || "作者未提供"} · ${date(note.published_at)} · 赞 ${note.likes || 0} · 收藏 ${note.collects || 0}`;
@@ -162,6 +169,7 @@
       $("detail-body").textContent = note.description || "暂未保存文字正文。";
       $("detail-comments").href = "/comments?note=" + encodeURIComponent(id);
       $("detail-original").href = "https://www.xiaohongshu.com/explore/" + id;
+      renderMedia(note.media || [], id);
       if (!$("note-detail").open) $("note-detail").showModal();
       updateButtons();
     } catch (error) { toast(error.message); }
@@ -181,6 +189,7 @@
       $("setup-warning").textContent = !status.notes_environment_ready ? "笔记采集环境尚未安装，请运行项目中的 Install-Notes.ps1 后重启服务。" : "请先返回群记录工作台扫码登录，再采集笔记和评论。";
       renderJob();
       updateButtons();
+      if (commentsView) await loadMonitors();
       if (state.revision !== status.notes_summary.revision) {
         state.revision = status.notes_summary.revision;
         await Promise.all([loadList(), loadScope()]);
@@ -192,6 +201,7 @@
   async function download(kind) {
     const params = new URLSearchParams({ dataset: commentsView ? "comments" : "notes", kind, search: $("local-filter").value });
     if (selectedNote) params.set("note_id", selectedNote);
+    if (commentsView) params.set("level", $("comment-level").value);
     try {
       const response = await fetch("/api/notes/export?" + params, { headers: { "X-Local-Token": state.token }, cache: "no-store" });
       if (!response.ok) throw new Error("导出未完成，请刷新后重试。");
@@ -204,19 +214,117 @@
       setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (error) { toast(error.message); }
   }
+  function clearPreview() {
+    $("media-preview").replaceChildren();
+    $("media-preview").hidden = true;
+    if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
+    state.previewUrl = "";
+  }
+  function renderMedia(files, noteId) {
+    const container = $("detail-media-list");
+    container.replaceChildren();
+    if (!files.length) {
+      container.append(node("p", "field-hint", "尚未下载媒体。点击下方“下载图片 / 视频”保存到本机。"));
+      return;
+    }
+    files.forEach(file => {
+      const row = node("div", "media-file");
+      row.append(node("span", "", `${file.name} · ${(file.bytes / 1024 / 1024).toFixed(2)} MB`));
+      for (const preview of [true, false]) {
+        const button = node("button", "button small", preview ? "预览" : "下载文件");
+        button.addEventListener("click", async () => {
+          button.disabled = true;
+          try {
+            const response = await fetch(`/api/notes/${noteId}/media/${encodeURIComponent(file.name)}`, { headers: { "X-Local-Token": state.token } });
+            if (!response.ok) throw new Error("文件无法读取，可能已被移动，请重新下载媒体。");
+            const blob = await response.blob();
+            if (preview) {
+              if (!$("note-detail").open || state.detail !== noteId) return;
+              clearPreview();
+              state.previewUrl = URL.createObjectURL(blob);
+              const media = document.createElement(file.kind === "video" ? "video" : "img");
+              if (file.kind === "video") { media.controls = true; media.preload = "metadata"; }
+              else media.alt = "已下载的笔记图片";
+              media.src = state.previewUrl;
+              $("media-preview").append(media);
+              $("media-preview").hidden = false;
+            } else {
+              const url = URL.createObjectURL(blob), link = document.createElement("a");
+              link.href = url; link.download = file.name; link.click();
+              setTimeout(() => URL.revokeObjectURL(url), 1000);
+            }
+          } catch (error) { toast(error.message); }
+          finally { button.disabled = false; }
+        });
+        row.append(button);
+      }
+      container.append(row);
+    });
+  }
+  let monitorInitialized = false;
+  async function loadMonitors() {
+    const data = await api("/api/note-monitors");
+    state.monitors = data.items;
+    const selected = data.items.find(item => item.note_id === selectedNote);
+    if (selected && !monitorInitialized) {
+      for (const [id, value] of [["note-monitor-interval", selected.interval_minutes], ["refresh-limit", selected.max_comments], ["refresh-reply-limit", selected.max_replies]]) {
+        if (![...$(id).options].some(option => option.value === String(value))) $(id).add(new Option(String(value), String(value)));
+        $(id).value = String(value);
+      }
+      $("refresh-replies").checked = selected.include_replies;
+    }
+    monitorInitialized = true;
+    $("note-monitor-badge").textContent = selected?.enabled ? "已开启" : "已暂停";
+    $("note-monitor-toggle").textContent = selected?.enabled ? "暂停定时检查" : "开启定时检查";
+    $("note-monitor-state").textContent = selected?.last_error || (selected?.enabled ? `下次检查：${date(selected.next_run)}。其他任务进行时会顺延。` : "最多同时监测 10 篇。暂停后当前采集会继续，可通过上方按钮取消任务。");
+    const list = $("note-monitors-list");
+    list.replaceChildren();
+    if (!data.items.length) list.append(node("p", "field-hint", "从笔记的“查看评论”进入单篇评论页，即可设置定时检查。"));
+    data.items.forEach(item => {
+      const row = node("div", "monitor-row");
+      const label = node("div"), link = node("a", "text-button", item.title || "无标题笔记");
+      link.href = "/comments?note=" + encodeURIComponent(item.note_id);
+      label.append(link, node("p", "field-hint", item.last_error || (item.enabled ? `每 ${item.interval_minutes} 分钟 · 下次 ${date(item.next_run)}` : "已暂停")));
+      const button = node("button", "button small", item.enabled ? "暂停" : "恢复");
+      button.addEventListener("click", () => saveMonitor(!item.enabled, item));
+      row.append(label, button); list.append(row);
+    });
+  }
+  async function saveMonitor(enabled, saved = null) {
+    const body = saved ? { note_id: saved.note_id, enabled, interval_minutes: saved.interval_minutes,
+      max_comments: saved.max_comments, include_replies: saved.include_replies, max_replies: saved.max_replies } : {
+      note_id: selectedNote, enabled, interval_minutes: Number($("note-monitor-interval").value),
+      max_comments: Number($("refresh-limit").value), include_replies: $("refresh-replies").checked,
+      max_replies: Number($("refresh-reply-limit").value)
+    };
+    try { await api("/api/note-monitors", { method: "POST", body: JSON.stringify(body) }); await loadMonitors(); toast(enabled ? "定时检查已开启，按设置间隔执行。" : "定时检查已暂停。"); }
+    catch (error) { toast(error.message); }
+  }
+  $("creator-form").addEventListener("submit", event => {
+    event.preventDefault();
+    startJob({ mode: "creator", url: $("creator-url").value, max_notes: Number($("creator-limit").value) });
+  });
+  $("detail-media").addEventListener("click", () => { if (state.detail) startJob({ mode: "media", note_id: state.detail, max_comments: 0 }); });
+  $("detail-creator").addEventListener("click", () => {
+    if (state.creator) { startJob({ mode: "creator", url: state.creator, max_notes: Number($("creator-limit").value) }); $("note-detail").close(); }
+  });
+  $("comment-level").addEventListener("change", () => { state.page = 1; loadList(); });
+  $("note-monitor-toggle").addEventListener("click", () => saveMonitor(!state.monitors.find(item => item.note_id === selectedNote)?.enabled));
   $("note-search-form").addEventListener("submit", event => {
     event.preventDefault();
-    startJob({ mode: "search", keyword: $("keyword").value, sort: $("note-sort").value, max_notes: Number($("note-limit").value) });
+    startJob({ mode: "search", keyword: $("keyword").value, sort: $("note-sort").value, max_notes: Number($("note-limit").value), note_type: Number($("search-note-type").value) });
   });
   $("note-link-form").addEventListener("submit", event => {
     event.preventDefault();
-    startJob({ mode: "detail", url: $("note-url").value, max_comments: Number($("comment-limit").value) });
+    startJob({ mode: "detail", url: $("note-url").value, max_comments: Number($("comment-limit").value),
+      include_replies: $("include-replies").checked, max_replies: Number($("reply-limit").value) });
   });
-  $("refresh-comments").addEventListener("click", () => startJob({ mode: "comments", note_id: selectedNote, max_comments: Number($("refresh-limit").value) }));
+  $("refresh-comments").addEventListener("click", () => startJob({ mode: "comments", note_id: selectedNote, max_comments: Number($("refresh-limit").value),
+    include_replies: $("refresh-replies").checked, max_replies: Number($("refresh-reply-limit").value) }));
   $("comment-limit").addEventListener("change", updateButtons);
   $("detail-capture").addEventListener("click", () => { if (state.detail) capture(state.detail); });
   $("close-detail").addEventListener("click", () => $("note-detail").close());
-  $("note-detail").addEventListener("close", () => { state.detail = ""; state.detailRequest++; });
+  $("note-detail").addEventListener("close", () => { state.detail = ""; state.detailRequest++; clearPreview(); });
   $("cancel-note-job").addEventListener("click", async () => {
     const job = state.status?.jobs[0];
     if (!job) return;
@@ -232,11 +340,14 @@
     document.body.classList.add("comments-view");
     $("page-title").textContent = "评论管理";
     $("page-description").textContent = "把分散的讨论收集到一起，搜索、阅读，保留有用的反馈。";
-    $("list-title").textContent = "已保存一级评论";
+    $("list-title").textContent = "已保存评论与回复";
     $("local-filter").placeholder = "搜索评论文字或昵称";
     $("comment-scope").hidden = !selectedNote;
     $("comment-refresh").hidden = !selectedNote;
     $("all-comments").hidden = !selectedNote;
+    $("comment-level").hidden = false;
+    $("note-monitor-panel").hidden = !selectedNote;
+    $("note-monitors-panel").hidden = false;
   }
   $(commentsView ? "nav-comments" : "nav-notes").classList.add("active");
   $(commentsView ? "nav-comments" : "nav-notes").setAttribute("aria-current", "page");

@@ -18,13 +18,10 @@ from urllib.parse import parse_qs, urljoin, urlsplit
 PROJECT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT))
 from webapp.notes import NotesStore, valid_note_id
+from integration.notes_extra import NotesFailure, timestamp, comment_row, fetch_replies, fetch_creator_notes, download_media
 
 MC_COMMIT = "68d9ef1c1da22eab75940dfd7cec259907006538"
 ALLOWED_HOSTS = {"www.xiaohongshu.com", "xiaohongshu.com", "xhslink.com", "www.xhslink.com"}
-
-
-class NotesFailure(RuntimeError):
-    pass
 
 
 def validate_url(value):
@@ -70,20 +67,13 @@ def progress(stage, count=0):
     print("notes_progress=" + json.dumps({"stage": stage, "count": count}), flush=True)
 
 
-def timestamp(value):
-    try:
-        number = float(value or 0)
-        return number / 1000 if number > 100000000000 else number
-    except (TypeError, ValueError):
-        return 0
-
-
 def normalize_note(card, note_id):
     valid_note_id(note_id)
     user = card.get("user") or {}
     counts = card.get("interact_info") or {}
     return {"id": note_id, "title": str(card.get("title") or card.get("display_title") or "无标题笔记"),
             "description": str(card.get("desc") or ""), "author": str(user.get("nickname") or ""),
+            "creator_id": str(user.get("user_id") or ""),
             "kind": str(card.get("type") or "normal"), "published_at": timestamp(card.get("time")),
             "likes": str(counts.get("liked_count") or "0"), "collects": str(counts.get("collected_count") or "0"),
             "comment_count": str(counts.get("comment_count") or "0")}
@@ -101,12 +91,9 @@ async def fetch_comments(client, note_id, token, limit, delay=1.2):
             comment_id = str(item["id"])
             if comment_id not in comments and len(comments) >= limit:
                 return list(comments.values()), False
-            user = item.get("user_info") or {}
-            comments[comment_id] = {"id": comment_id, "author": str(user.get("nickname") or ""),
-                                    "content": str(item.get("content") or ""),
-                                    "published_at": timestamp(item.get("create_time")),
-                                    "likes": str(item.get("like_count") or "0"),
-                                    "reply_count": int(item.get("sub_comment_count") or 0)}
+            comments[comment_id] = {**comment_row(item), "_sub_comments": item.get("sub_comments", []),
+                                    "_sub_cursor": item.get("sub_comment_cursor", ""),
+                                    "_sub_has_more": item.get("sub_comment_has_more")}
         progress("comments", len(comments))
         if response.get("has_more") is False:
             return list(comments.values()), True
@@ -174,14 +161,21 @@ async def run(args):
     info = await client.query_self()
     if not info or not (info.get("data") or {}).get("result", {}).get("success"):
         raise NotesFailure("notes_auth")
+    if request["mode"] == "creator":
+        progress("creator")
+        found = await fetch_creator_notes(client, request["url"], request["max_notes"])
+        for note, token, source in found:
+            store.save_note(note, token=token, source=source, keyword="作者作品")
+        progress("creator_saved", len(found))
+        return
     if request["mode"] == "search":
-        from media_platform.xhs.field import SearchSortType
+        from media_platform.xhs.field import SearchSortType, SearchNoteType
         from media_platform.xhs.help import get_search_id
         found, seen, search_id = [], set(), get_search_id()
         progress("search")
         for page in range(1, 3):
             response = await client.get_note_by_keyword(request["keyword"], search_id=search_id, page=page,
-                                                        sort=SearchSortType(request["sort"]))
+                                                        sort=SearchSortType(request["sort"]), note_type=SearchNoteType(request.get("note_type", 0)))
             if not isinstance(response, dict) or not isinstance(response.get("items"), list):
                 raise NotesFailure("notes_response")
             for item in response["items"]:
@@ -216,16 +210,28 @@ async def run(args):
         token, source = access["token"], access["source"]
     if not token:
         raise NotesFailure("notes_token")
-    if request["mode"] == "detail":
+    if request["mode"] in {"detail", "media"}:
         progress("detail")
         note = await client.get_note_by_id(note_id, source, token)
         if not note or note.get("note_id") != note_id:
             raise NotesFailure("notes_response")
         store.save_note(normalize_note(note, note_id), token=token, source=source, detailed=True)
+        if request["mode"] == "media":
+            count = await download_media(note, args.data, store)
+            progress("media_saved", count)
+            return
     if request["max_comments"]:
         rows, complete = await fetch_comments(client, note_id, token, request["max_comments"])
-        store.save_comments(note_id, rows, complete=complete)
-        progress("comments_saved" if complete else "comments_limited", len(rows))
+        root_count = len(rows)
+        replies_complete = None
+        if request.get("include_replies"):
+            progress("replies")
+            replies, replies_complete = await fetch_replies(client, note_id, token, rows, request.get("max_replies", 100))
+            rows.extend(replies)
+        store.save_comments(note_id, rows, complete=complete, replies_complete=replies_complete)
+        progress("comments_saved" if complete else "comments_limited", root_count)
+        if replies_complete is not None:
+            progress("replies_saved" if replies_complete else "replies_limited", len(replies))
     else:
         progress("detail_saved", 1)
 

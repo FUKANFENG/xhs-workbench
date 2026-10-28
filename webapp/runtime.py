@@ -61,6 +61,10 @@ def public_error(line: str) -> str:
         "notes_pagination": "评论分页未能继续，本次评论未写入，旧记录仍保留。",
         "notes_network": "连接小红书超时或失败，请检查网络后重试。",
         "notes_failed": "笔记采集未完成，已保留之前保存的记录。请检查链接、登录状态后重试。",
+        "notes_no_media": "这篇笔记没有返回可下载的媒体文件。",
+        "notes_media_failed": "部分媒体下载失败，已完成的文件会保留，可稍后重试。",
+        "notes_media_size": "媒体文件超出本次大小限制，下载已停止。",
+        "notes_media_limit": "这篇笔记的媒体超过本次 30 个文件上限，未启动下载。",
     }
     if value.removeprefix("error=") in note_errors:
         return note_errors[value.removeprefix("error=")]
@@ -144,7 +148,11 @@ class JobRunner:
                            "search_saved": f"已保存 {count} 条搜索结果，可选择笔记采集完整详情。",
                            "comments_saved": f"已合并 {count} 条一级评论，本次已读到分页末尾。",
                            "comments_limited": f"已合并 {count} 条一级评论，达到本次上限；已有记录保留。",
-                           "detail_saved": "笔记详情已保存。"}.get(event.get("stage"))
+                           "detail_saved": "笔记详情已保存。", "replies": "正在获取二级回复。",
+                           "replies_saved": f"已合并 {count} 条回复，本轮选取的评论回复已读取完成。",
+                           "replies_limited": f"已合并 {count} 条回复，达到本次回复上限。",
+                           "creator": "正在读取作者作品列表。", "creator_saved": f"已保存 {count} 篇作者作品摘要。",
+                           "media": f"已保存 {count} 个媒体文件。", "media_saved": f"已保存 {count} 个媒体文件，可在笔记详情中预览或下载。"}.get(event.get("stage"))
             except (TypeError, ValueError, AttributeError):
                 pass
         elif match := re.search(r"added (\d+) new messages", line):

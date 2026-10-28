@@ -1,5 +1,7 @@
 # 小红书工作台 · XHS Workbench
 
+[![Docker build and tests](https://github.com/FUKANFENG/xhs-workbench/actions/workflows/docker-test.yml/badge.svg)](https://github.com/FUKANFENG/xhs-workbench/actions/workflows/docker-test.yml)
+
 一个在本机运行的中文 Web 工作台，把小红书的**群记录、笔记、评论与回复、作者作品和媒体文件**放在同一个界面中管理。
 
 扫码登录，数据保存在自己的电脑或 Docker 数据卷中。不自动发言、点赞、关注或发送私信。项目面向非商业学习与研究，使用条件见下方许可说明。
@@ -153,6 +155,8 @@ docker build --target test -t xhs-workbench:test .
 ```
 
 测试使用临时目录和合成数据，不需要真实账号。验证范围见 [验证记录](LOCAL_VERIFICATION.md)。原始 Agent Skill 说明保留在 [上游说明](docs/UPSTREAM_SKILL_README.md)。
+
+2026-10-29 已在 GitHub Actions 的 Linux amd64 环境完成镜像构建、53 项测试和只读容器启动检查。镜像内两套采集环境均就绪，初始数据卷无登录凭据。真实账号采集的既有验证来自 Windows 本地版；Docker 首次使用仍需要自行扫码。
 
 ## 来源与许可
 

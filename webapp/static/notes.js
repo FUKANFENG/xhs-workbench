@@ -297,7 +297,7 @@
       max_comments: Number($("refresh-limit").value), include_replies: $("refresh-replies").checked,
       max_replies: Number($("refresh-reply-limit").value)
     };
-    try { await api("/api/note-monitors", { method: "POST", body: JSON.stringify(body) }); await loadMonitors(); toast(enabled ? "定时检查已开启，按设置间隔执行。" : "定时检查已暂停。"); }
+    try { await api("/api/note-monitors", { method: "POST", body: JSON.stringify(body) }); await loadMonitors(); toast(enabled ? "设置已保存，定时检查已开启。" : "设置已保存，定时检查已暂停。"); }
     catch (error) { toast(error.message); }
   }
   $("creator-form").addEventListener("submit", event => {
@@ -310,6 +310,7 @@
   });
   $("comment-level").addEventListener("change", () => { state.page = 1; loadList(); });
   $("note-monitor-toggle").addEventListener("click", () => saveMonitor(!state.monitors.find(item => item.note_id === selectedNote)?.enabled));
+  $("note-monitor-save").addEventListener("click", () => saveMonitor(Boolean(state.monitors.find(item => item.note_id === selectedNote)?.enabled)));
   $("note-search-form").addEventListener("submit", event => {
     event.preventDefault();
     startJob({ mode: "search", keyword: $("keyword").value, sort: $("note-sort").value, max_notes: Number($("note-limit").value), note_type: Number($("search-note-type").value) });

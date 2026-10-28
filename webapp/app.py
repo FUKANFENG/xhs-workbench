@@ -92,7 +92,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
 
     @app.get("/api/bootstrap")
     def bootstrap():
-        return {"token": token, "app_name": "小红书工作台", "version": "本地版 1.1"}
+        return {"token": token, "app_name": "小红书工作台", "version": "本地版 1.2"}
 
     @app.get("/api/status")
     def status():

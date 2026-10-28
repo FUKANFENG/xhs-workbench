@@ -1,0 +1,46 @@
+name: Docker build and tests
+on:
+  push:
+    branches: [main]
+    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", ".github/workflows/docker-test.yml"]
+  pull_request:
+    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", ".github/workflows/docker-test.yml"]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Build image and run account-free tests
+        run: docker build --target test -t xhs-workbench:test .
+      - name: Check read-only container startup
+        run: |
+          docker run -d --name xhs-ci --init --read-only --tmpfs /tmp:mode=1777 --cap-drop ALL --security-opt no-new-privileges:true --mount type=volume,source=xhs-ci-data,target=/data -p 127.0.0.1:8779:8777 xhs-workbench:test
+          if ($LASTEXITCODE -ne 0) { throw 'Container failed to start.' }
+          try {
+            $ready = $false
+            for ($attempt = 0; $attempt -lt 45; $attempt++) {
+              try {
+                $health = Invoke-RestMethod http://127.0.0.1:8779/api/health -TimeoutSec 2
+                if ($health.status -eq 'ok') { $ready = $true; break }
+              } catch {}
+              Start-Sleep -Seconds 2
+            }
+            if (-not $ready) { docker logs xhs-ci; throw 'Health check failed.' }
+            $bootstrap = Invoke-RestMethod http://127.0.0.1:8779/api/bootstrap
+            $state = Invoke-RestMethod http://127.0.0.1:8779/api/status -Headers @{'X-Local-Token'=$bootstrap.token}
+            if (-not $state.environment_ready -or -not $state.notes_environment_ready -or $state.credential_saved) {
+              throw 'Unexpected runtime state or credentials present in image.'
+            }
+          } finally {
+            docker rm -f xhs-ci
+            docker volume rm xhs-ci-data
+          }

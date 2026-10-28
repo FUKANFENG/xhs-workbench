@@ -1,0 +1,22 @@
+# Allowlist: local credentials, databases, downloads and Git history never enter the build context.
+**
+!Dockerfile
+!requirements-lock.txt
+!LICENSE
+!THIRD_PARTY_NOTICES.md
+!docker/
+!docker/**
+!webapp/
+!webapp/**
+!integration/
+!integration/**
+!skills/
+!skills/**
+!tests/
+!tests/**
+**/__pycache__/**
+**/*.pyc
+**/.env*
+**/*cookie*.txt
+**/*.sqlite*
+**/node_modules/**

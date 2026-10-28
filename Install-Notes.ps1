@@ -1,7 +1,7 @@
 param([string]$SourceRepository = 'https://github.com/NanmiCoder/MediaCrawler.git')
 $ErrorActionPreference = 'Stop'
-$WorkspacePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$RuntimePath = Join-Path $WorkspacePath 'work\xhs-local-data\runtime\MediaCrawler'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
+$RuntimePath = Join-Path $DataPath 'runtime\MediaCrawler'
 $PinnedRevision = '68d9ef1c1da22eab75940dfd7cec259907006538'
 if (-not (Get-Command uv -ErrorAction SilentlyContinue)) { throw '请先安装 uv，再运行此脚本。' }
 if (-not (Test-Path -LiteralPath $RuntimePath)) {

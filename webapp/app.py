@@ -37,7 +37,8 @@ class MonitorInput(BaseModel):
 
 
 def create_app(data_root: Path | None = None) -> FastAPI:
-    root = data_root or Path(os.environ.get("XHS_LOCAL_DATA", PROJECT.parent.parent / "work" / "xhs-local-data"))
+    legacy = PROJECT.parent.parent / "work" / "xhs-local-data"
+    root = data_root or Path(os.environ.get("XHS_LOCAL_DATA", legacy if legacy.is_dir() else PROJECT / "data"))
     service = LocalService(root)
     token = secrets.token_urlsafe(32)
 

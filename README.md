@@ -1,134 +1,163 @@
-# xhs-group-chat-insights
+# 小红书工作台 · XHS Workbench
 
-一个只读的 Agent Skill 与 Python 工具集：在用户授权范围内抓取或增量更新小红书群聊，离线提取群话题，并分析多个群平时讨论什么、成员关心什么、互动如何发生，以及哪些问题仍未闭环。
+一个在本机运行的中文 Web 工作台，把小红书的**群记录、笔记、评论与回复、作者作品和媒体文件**放在同一个界面中管理。
 
-目前在 Codex 本地环境中完成了端到端验证；`SKILL.md` 采用 Agent Skills 目录结构，其他支持该规范且具备本地 Shell 能力的 Agent 也可以适配。分析脚本还可以脱离 Agent 单独运行。
+扫码登录，数据保存在自己的电脑或 Docker 数据卷中。不自动发言、点赞、关注或发送私信。项目面向非商业学习与研究，使用条件见下方许可说明。
 
-> 重要：群聊记录和 Cookie 都属于敏感数据。这个仓库只放 Skill 本身，绝不能提交真实 Cookie、原始群聊、成员名单或含私聊证据的分析报告。
+## 功能
 
-## 能做什么
+| 模块 | 支持内容 |
+|---|---|
+| 登录 | 手机扫码、凭据本地保存、登录阶段和失败提示 |
+| 群记录 | 首次采集、断点续抓、增量更新、定时更新、关键词搜索、CSV/JSON 导出 |
+| 群分析 | 关键词话题统计、参与情况、讨论线索，无需付费大模型 |
+| 笔记 | 关键词搜索、综合/最新/热门排序、图文/视频筛选、分享链接采集、正文阅读 |
+| 作者作品 | 按作者主页链接或作者 ID 获取作品摘要 |
+| 评论与回复 | 一级评论、二级回复、父评论上下文、去重合并、层级筛选、导出 |
+| 媒体 | 图片和视频下载、本地预览、单文件保存 |
+| 笔记监测 | 最短 5 分钟，最多同时配置 10 篇，串行执行，失败自动暂停 |
+| 任务管理 | 进度、取消、超时保护、脱敏错误提示 |
 
-- 全量抓取、断点续抓和增量更新用户有权访问的群聊
-- 从已有 `messages.json` 中离线提取群话题和直接回复状态
-- 规范化一个或多个群的聊天记录
-- 生成话题、参与者和待深读事件三类研究表
-- 基于原文上下文形成“讨论主题—成员关切—群差异—未闭环问题”的分析
+## Docker 安装（推荐）
 
-不会自动发言、点赞、关注、邀请成员或修改群设置。
+需要 Git、Docker Engine + Compose v2，或已启动的 Docker Desktop（Linux containers）。宿主机不需要安装 Python、Node.js 或浏览器。
 
-## 仓库结构
+```console
+git clone https://github.com/FUKANFENG/xhs-workbench.git
+cd xhs-workbench
+docker compose up -d --build --wait
+```
+
+打开 **[http://127.0.0.1:8779](http://127.0.0.1:8779)**，点击“生成登录二维码”，用手机小红书扫码并确认。
+
+Windows 也可以运行一键安装脚本：
+
+```powershell
+.\Install-Docker.ps1
+# 更换端口：
+.\Install-Docker.ps1 -Port 8780
+```
+
+首次构建会从 GitHub 下载固定版本的采集源码，并安装 Python/Node 依赖，需要能访问 GitHub、容器镜像源、PyPI 和 npm。后续构建会复用缓存。容器不会下载或启动浏览器。
+
+默认只将端口绑定到本机 `127.0.0.1`。容器使用非 root 用户，程序目录只读，数据写入独立命名卷。此配置适合单人本地使用，不提供面向公网的多用户登录系统。
+
+### 常用命令
+
+```console
+docker compose ps
+docker compose logs --tail=100 web
+docker compose stop
+docker compose start
+docker compose down
+```
+
+`stop` 和 `down` 不删除命名数据卷。**需要保留数据时，不要使用 `docker compose down -v`。**
+
+升级：
+
+```console
+git pull
+docker compose up -d --build --wait
+```
+
+长期修改端口：复制 `.env.example` 为 `.env`，将 `XHS_PORT` 改为需要的端口，再启动。Windows 脚本的 `-Port` 参数仅作用于本次命令。
+
+### 数据与备份
+
+Compose 的 `xhs-data` 命名卷挂载到容器 `/data`，实际卷名默认是 `xhs-workbench_xhs-data`。
+
+| 目录/文件 | 内容 |
+|---|---|
+| `/data/auth/` | 登录凭据、临时二维码 |
+| `/data/exports/` | 群记录、采集进度 |
+| `/data/derived/`、`/data/analysis/` | 群记录整理和分析结果 |
+| `/data/notes/notes.sqlite3` | 笔记、评论、监测配置和内部访问参数 |
+| `/data/notes/media/` | 已下载图片和视频 |
+| `/data/preferences.json` | 群备注、调度参数、最近登录结果 |
+
+备份时先停止服务，避免复制不一致的 SQLite 文件：
+
+```console
+docker compose stop
+docker compose cp web:/data ./xhs-backup
+docker compose start
+```
+
+备份包含凭据和原始内容，应留在自己的存储中。分享结果请使用页面的 CSV/JSON 导出。Docker 默认使用新的数据卷，不会自动复制 Windows 本地版的账户和数据。
+
+远程服务器建议通过 SSH 转发访问本机端口：
+
+```console
+ssh -L 8779:127.0.0.1:8779 your-user@your-server
+```
+
+随后在自己的电脑打开 `http://127.0.0.1:8779`。不要直接把此单用户工具暴露到公网。
+
+## 使用流程
+
+1. **扫码登录**：在群记录工作台完成登录，笔记和评论共用这份凭据。
+2. **群记录**：输入有权访问的群链接或群 ID，首次采集后可续抓、增量更新和分析。
+3. **笔记采集**：搜索关键词保存摘要，或粘贴完整笔记链接、分享短链接。摘要与已采集详情分别标记。
+4. **评论与回复**：设置一级评论上限，可选采集二级回复；回复总量单独设限。
+5. **作者作品**：输入主页链接/ID，或从已采集笔记的详情进入作者作品采集。
+6. **媒体**：打开笔记详情，点击“下载图片 / 视频”；完成后可预览或保存文件。
+7. **定时检查**：在单篇笔记的评论页配置，修改间隔或数量后点击“保存设置”。
+
+任务串行执行。暂停监测只停止后续调度，当前任务需在任务区取消。服务重启或重新扫码后，定时任务暂停，设置保留供手动恢复。
+
+## 范围与限制
+
+- 可采集内容由账号权限和平台返回决定，不保证全部历史、删除内容或入群前的记录。
+- 定时更新是分页轮询，不是秒级推送。达到上限时保留旧数据并标记本轮范围。
+- 评论按 ID 合并，不会因本轮未返回而删除旧记录，不作为平台撤回内容的严格镜像。
+- 二级回复限于本轮选取的一级评论下，总量单独设限。
+- 每篇最多下载 30 个媒体文件，单张图片最多 64 MiB、单个视频最多 512 MiB。视频预览取决于浏览器支持的编码。
+- 群分析基于关键词与互动统计，不包含内置大模型总结、图片 OCR、语音转写或自动通知推送。
+- 平台接口可能变化。升级采集引擎前，应重新验证登录与关键接口。
+
+## Windows 原生安装
+
+需要 Python 3.11、Node.js 20+、Git；笔记模块另外需要 `uv`。
+
+```powershell
+.\Install-Local.ps1
+.\Install-Notes.ps1
+.\Start-WebUI.ps1
+```
+
+默认打开 `http://127.0.0.1:8777`。停止时运行 `Stop-WebUI.ps1`。新安装的数据默认位于仓库 `data/`；已有工作区的数据路径继续保留，也可通过 `XHS_LOCAL_DATA` 指定。
+
+## 结构与开发
 
 ```text
-skills/xhs-group-chat-insights/
-├── SKILL.md
-├── agents/openai.yaml
-├── references/
-└── scripts/
+webapp/                         Web API、任务调度、数据库和前端
+integration/                    独立 MediaCrawler 适配进程
+skills/xhs-group-chat-insights/  群记录采集和离线分析工具
+docker/                         容器构建与启动脚本
+tests/                          存储、接口、分页、调度和安全边界测试
+Dockerfile / compose.yaml       容器安装配置
 ```
 
-## 兼容范围
+Web 服务/群记录和笔记采集使用两套独立 Python 环境，避免依赖冲突。它们共用数据目录和串行任务管理。
 
-- **Codex 本地环境：** 推荐且已验证。支持自动发现 Skill、`$xhs-group-chat-insights` 调用、二维码登录、抓取和分析完整流程。
-- **其他 Agent Skills 客户端：** `SKILL.md`、引用文件和脚本可以复用，但安装位置、自动发现方式和工具权限由宿主决定，尚未逐一验证。
-- **ChatGPT / OpenAI API：** Skill 文件可作为工作流资源集成；离线分析最容易迁移。实时抓取依赖本地浏览器、Shell、二维码登录和持久化目录，需要部署方提供这些运行条件。
-- **不使用 Agent：** 可以直接运行仓库里的 Python 脚本完成环境检查、登录、抓取、话题提取和分析。
+固定采集源码版本：
 
-`agents/openai.yaml` 提供 OpenAI 产品中的展示信息，不影响核心 Python 脚本在其他环境运行。
+- Spider_XHS：`23dab803a0465e35e01cf87137353a900b47e93d`
+- MediaCrawler：`68d9ef1c1da22eab75940dfd7cec259907006538`
 
-## 在 Codex 中安装（已验证）
+运行容器内测试：
 
-### 方式一：安装脚本
-
-通过本仓库安装：
-
-```bash
-python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py \
-  --repo q741242673/xhs-group-chat-insights \
-  --path skills/xhs-group-chat-insights
+```console
+docker build --target test -t xhs-workbench:test .
 ```
 
-安装后新开一个 Codex 对话，再使用 `$xhs-group-chat-insights`。
+测试使用临时目录和合成数据，不需要真实账号。验证范围见 [验证记录](LOCAL_VERIFICATION.md)。原始 Agent Skill 说明保留在 [上游说明](docs/UPSTREAM_SKILL_README.md)。
 
-### 方式二：手动复制
+## 来源与许可
 
-```bash
-git clone https://github.com/q741242673/xhs-group-chat-insights.git
-mkdir -p ~/.codex/skills
-cp -R xhs-group-chat-insights/skills/xhs-group-chat-insights ~/.codex/skills/
-```
+基于 [q741242673/xhs-group-chat-insights](https://github.com/q741242673/xhs-group-chat-insights) 扩展，保留其 MIT 版权声明和 [LICENSE](LICENSE)。
 
-如果目标目录已存在，先人工确认是否需要升级；不要直接覆盖。
+群记录和登录使用 [cv-cat/Spider_XHS](https://github.com/cv-cat/Spider_XHS)，笔记、评论和媒体使用 [NanmiCoder/MediaCrawler](https://github.com/NanmiCoder/MediaCrawler)。MediaCrawler 采用 **非商业学习使用许可证 1.1**，商业用途需要版权所有者书面同意。Spider_XHS 的 README 也声明仅限学习交流、禁止商业化。
 
-## 不使用 Codex：直接运行脚本
-
-克隆仓库后，可以从仓库根目录执行：
-
-```bash
-python3 skills/xhs-group-chat-insights/scripts/setup_capture.py --check
-python3 skills/xhs-group-chat-insights/scripts/setup_capture.py
-python3 skills/xhs-group-chat-insights/scripts/xhs_group_tool.py login-qr
-python3 skills/xhs-group-chat-insights/scripts/xhs_group_tool.py doctor
-```
-
-抓取、话题提取与分析的参数说明见 `skills/xhs-group-chat-insights/references/`。
-
-## 使用方式
-
-### 群聊链接从哪里获取
-
-最稳定的方式是在电脑浏览器中获取：
-
-1. 登录小红书网页版并进入“消息”。
-2. 打开你有权访问的目标群聊。
-3. 复制浏览器地址栏中的完整网址，格式通常为：
-
-   ```text
-   https://www.xiaohongshu.com/chat/123456789012345678
-   ```
-
-工具也接受网址末尾的纯数字群 ID。群聊链接可能包含群标识，请只在自己的本地任务中使用，不要发到公开 Issue 或提交进仓库。
-
-### 已有聊天记录：直接分析
-
-不需要登录，也不需要安装抓取环境。把 ZIP 或完整的 `messages.json` 提供给 Codex，然后说：
-
-```text
-请使用 $xhs-group-chat-insights 分析这些群聊记录，告诉我各群平时讨论什么、成员真正关心什么，并标注数据范围与局限。
-```
-
-### 没有聊天记录：先连接小红书
-
-首次使用需要完成环境检查和二维码登录。Skill 已内置所需的只读群聊扩展和配置脚本；本机需要 Python 3.10+、Node.js 20+ 和 Git。
-
-```bash
-python3 ~/.codex/skills/xhs-group-chat-insights/scripts/setup_capture.py --check
-python3 ~/.codex/skills/xhs-group-chat-insights/scripts/setup_capture.py
-python3 ~/.codex/skills/xhs-group-chat-insights/scripts/xhs_group_tool.py login-qr
-python3 ~/.codex/skills/xhs-group-chat-insights/scripts/xhs_group_tool.py doctor
-```
-
-第二条命令会下载依赖；第三条命令显示本地二维码，使用者需用自己的小红书 App 扫码确认。Cookie 只写入权限为 `600` 的本地配置文件，不会打印，也不得上传到 GitHub。
-
-群聊链接**不需要填进上面的安装或登录命令**。`doctor` 检查通过后，回到 Codex 对话，把刚才复制的链接放进请求里：
-
-```text
-请使用 $xhs-group-chat-insights 抓取并分析这个群聊：
-https://www.xiaohongshu.com/chat/123456789012345678
-```
-
-如果不使用 Codex，也可以在命令行直接输入：
-
-```bash
-python3 ~/.codex/skills/xhs-group-chat-insights/scripts/xhs_group_tool.py \
-  group-chat \
-  --chat-url 'https://www.xiaohongshu.com/chat/123456789012345678' \
-  --output-dir './chat-exports'
-```
-
-更完整的运行说明见 Skill 内的 `references/setup.md` 和 `references/capture.md`。
-
-## 技术说明与使用边界
-
-实时抓取底层使用外部项目 [Spider_XHS](https://github.com/cv-cat/Spider_XHS)。本仓库不包含该项目代码；初始化脚本会下载经过测试的固定版本。它有独立的使用声明和限制，请同时遵守其最新说明、小红书平台规则以及适用法律。
-
-本仓库中的 Skill、分析脚本和只读群聊扩展采用 MIT License。
+依赖的许可与上游声明不会被本仓库的 MIT 许可替代。完整说明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。Docker 构建保留第三方源码中的版权和许可文件。

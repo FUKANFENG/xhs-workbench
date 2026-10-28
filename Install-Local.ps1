@@ -1,6 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$WorkspacePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$DataPath = Join-Path $WorkspacePath 'work\xhs-local-data'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $RuntimePath = Join-Path $DataPath 'runtime\Spider_XHS'
 $CookiePath = Join-Path $DataPath 'auth\xhs-cookie.txt'
 $InstallerPath = Join-Path $PSScriptRoot 'skills\xhs-group-chat-insights\scripts\setup_capture.py'

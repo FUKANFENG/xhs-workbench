@@ -1,8 +1,6 @@
 param([int]$Port = 8777)
 $ErrorActionPreference = 'Stop'
-$ProjectPath = $PSScriptRoot
-$WorkspacePath = Split-Path (Split-Path $ProjectPath -Parent) -Parent
-$DataPath = Join-Path $WorkspacePath 'work\xhs-local-data'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $PythonPath = Join-Path $DataPath 'runtime\Spider_XHS\.venv\Scripts\python.exe'
 $PidPath = Join-Path $DataPath 'web-ui.pid'
 if (-not (Test-Path -LiteralPath $PythonPath)) { throw '运行环境尚未安装，请先运行 Install-Local.ps1。' }

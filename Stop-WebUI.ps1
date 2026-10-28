@@ -1,6 +1,5 @@
 $ErrorActionPreference = 'Stop'
-$WorkspacePath = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$DataPath = Join-Path $WorkspacePath 'work\xhs-local-data'
+. (Join-Path $PSScriptRoot 'Local-Paths.ps1')
 $PidPath = Join-Path $DataPath 'web-ui.pid'
 $PythonPath = Join-Path $DataPath 'runtime\Spider_XHS\.venv\Scripts\python.exe'
 if (-not (Test-Path -LiteralPath $PidPath)) { Write-Output '没有找到本地服务进程记录。'; return }

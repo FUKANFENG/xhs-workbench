@@ -1,6 +1,14 @@
 # Secrets and local configuration
 .env
 .env.*
+!.env.example
+*.sqlite*
+*.db
+*.log
+*.pid
+backups/
+work/
+.pytest_cache/
 *cookie*.txt
 *.cookie
 *login-qr*.png

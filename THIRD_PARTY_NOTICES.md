@@ -1,5 +1,19 @@
 # 第三方组件
 
+## xhs-group-chat-insights
+
+来源：https://github.com/q741242673/xhs-group-chat-insights
+
+本项目基于其群记录工具与 Agent Skill 扩展，保留根目录及技能目录中的 MIT LICENSE 和原有版权声明。
+
+## Spider_XHS
+
+来源：https://github.com/cv-cat/Spider_XHS
+
+固定版本：23dab803a0465e35e01cf87137353a900b47e93d。
+
+用于扫码登录、签名和群历史接口。该固定版本的 README 声明“仅供学习交流使用，禁止任何商业化行为”。应遵守上游声明；本项目的 MIT 许可不替代依赖的使用条件。Docker 构建保留上游源码及 README。
+
 ## MediaCrawler
 
 来源：https://github.com/NanmiCoder/MediaCrawler

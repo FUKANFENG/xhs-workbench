@@ -7,6 +7,7 @@ import json
 import os
 import re
 import subprocess
+import signal
 import threading
 import time
 import uuid
@@ -203,6 +204,7 @@ class JobRunner:
                         stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                         text=True, encoding="utf-8", errors="replace", bufsize=1,
                         creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                        start_new_session=os.name != "nt",
                     )
                     process = self.process
                 assert process.stdout is not None
@@ -252,7 +254,10 @@ class JobRunner:
                                capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW,
                                timeout=15, check=False)
             else:
-                process.terminate()
+                try:
+                    os.killpg(process.pid, signal.SIGTERM)
+                except ProcessLookupError:
+                    pass
 
     def close(self) -> None:
         with self.lock:

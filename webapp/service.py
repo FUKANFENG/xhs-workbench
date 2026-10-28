@@ -9,10 +9,12 @@ import re
 import sys
 import threading
 import time
+import uuid
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
 from .runtime import BusyError, JobRunner
+from .notes import NotesStore, valid_note_id
 
 PROJECT = Path(__file__).resolve().parent.parent
 SCRIPTS = PROJECT / "skills" / "xhs-group-chat-insights" / "scripts"
@@ -51,6 +53,52 @@ class LocalService:
         self.runner = JobRunner(PROJECT, self.finished)
         self.stop_event = threading.Event()
         self.cache: dict[str, tuple[float, dict, list[dict]]] = {}
+        self.notes = NotesStore(self.root / "notes")
+        self.media_root = Path(os.environ.get("XHS_MEDIA_ROOT", self.root / "runtime" / "MediaCrawler")).resolve()
+        self.media_python = self.media_root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+        self.note_requests: dict[str, Path] = {}
+
+    def notes_ready(self):
+        return self.media_python.is_file() and (self.media_root / "media_platform/xhs/client.py").is_file()
+
+    def start_note_job(self, request):
+        from integration.notes_worker import validate_url, parse_note_url
+        from urllib.parse import urlsplit
+        if not self.credential_saved():
+            raise ValueError("请先在群记录工作台扫码登录，笔记采集会共用这次登录。")
+        if not self.notes_ready():
+            raise ValueError("笔记采集环境未就绪，请运行 Install-Notes.ps1。")
+        mode = request["mode"]
+        if mode == "comments" and not request["max_comments"]:
+            raise ValueError("更新评论时，采集上限必须大于零。")
+        if mode == "search":
+            request["keyword"] = request["keyword"].strip()
+            if not request["keyword"]:
+                raise ValueError("请输入搜索关键词。")
+        elif request.get("url") and mode == "detail":
+            request["url"] = validate_url(request["url"])
+            if urlsplit(request["url"]).hostname in {"www.xiaohongshu.com", "xiaohongshu.com"}:
+                parse_note_url(request["url"])
+        else:
+            valid_note_id(request["note_id"])
+            self.notes.get(request["note_id"])
+        with self.lock:
+            if self.runner.busy:
+                raise BusyError("已有任务正在执行，请等待完成或先取消。")
+            folder = self.root / "notes" / "requests"
+            folder.mkdir(exist_ok=True)
+            path = folder / (uuid.uuid4().hex + ".json")
+            path.write_text(json.dumps(request, ensure_ascii=False), encoding="utf-8")
+            command = [str(self.media_python), str(PROJECT / "integration/notes_worker.py"),
+                       "--runtime", str(self.media_root), "--data", str(self.root), "--request", str(path)]
+            try:
+                job = self.runner.start("notes_" + mode, {"search": "搜索笔记", "detail": "采集笔记与评论", "comments": "更新一级评论"}[mode],
+                                        [command], timeout=900)
+            except Exception:
+                path.unlink(missing_ok=True)
+                raise
+            self.note_requests[job["id"]] = path
+            return job
 
     def start_scheduler(self) -> None:
         threading.Thread(target=self._schedule_loop, daemon=True).start()
@@ -141,6 +189,10 @@ class LocalService:
 
     def finished(self, job: dict) -> None:
         with self.lock:
+            if job["kind"].startswith("notes_"):
+                path = self.note_requests.pop(job["id"], None)
+                if path:
+                    path.unlink(missing_ok=True)
             if job["kind"] == "login":
                 try:
                     self.qr.unlink(missing_ok=True)

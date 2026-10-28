@@ -49,6 +49,21 @@ def login_error(diagnostic: dict) -> str:
 def public_error(line: str) -> str:
     """Translate expected CLI errors without returning credentials or traces."""
     value = line.lower()
+    note_errors = {
+        "notes_auth": "登录已失效或访问被拒绝，请重新扫码后再试。",
+        "notes_blocked": "平台限制了本次请求，任务已停止，请稍后再试。",
+        "notes_runtime": "笔记采集环境版本不匹配，请重新运行 Install-Notes.ps1。",
+        "notes_token": "链接缺少访问参数。请复制完整分享链接，或先搜索这篇笔记再采集。",
+        "notes_link": "无法解析分享短链接，请复制小红书网页版的完整笔记链接。",
+        "notes_missing": "这篇笔记已删除、不可见，或当前账号无法访问。",
+        "notes_access": "平台未返回可用内容，请重新搜索笔记或使用新的完整分享链接。",
+        "notes_response": "平台返回的数据格式不完整，本次采集已停止，旧记录仍保留。",
+        "notes_pagination": "评论分页未能继续，本次评论未写入，旧记录仍保留。",
+        "notes_network": "连接小红书超时或失败，请检查网络后重试。",
+        "notes_failed": "笔记采集未完成，已保留之前保存的记录。请检查链接、登录状态后重试。",
+    }
+    if value.removeprefix("error=") in note_errors:
+        return note_errors[value.removeprefix("error=")]
     if "incremental update reached" in value:
         return "新增消息超过本次页数上限，旧记录已保留。请增加页数后重试。"
     if any(word in value for word in ("qr code expired", "timed out waiting", "timeout")):
@@ -118,6 +133,20 @@ class JobRunner:
         elif line.startswith("login_progress="):
             stage = line.split("=", 1)[1]
             message = LOGIN_STAGES.get(stage)
+        elif line.startswith("notes_progress="):
+            try:
+                event = json.loads(line.split("=", 1)[1])
+                count = event.get("count", 0)
+                if type(count) is not int or not 0 <= count <= 100000:
+                    return
+                message = {"auth": "正在校验共享登录状态。", "search": "正在搜索小红书笔记。",
+                           "detail": "正在读取笔记详情。", "comments": f"已读取 {count} 条一级评论。",
+                           "search_saved": f"已保存 {count} 条搜索结果，可选择笔记采集完整详情。",
+                           "comments_saved": f"已合并 {count} 条一级评论，本次已读到分页末尾。",
+                           "comments_limited": f"已合并 {count} 条一级评论，达到本次上限；已有记录保留。",
+                           "detail_saved": "笔记详情已保存。"}.get(event.get("stage"))
+            except (TypeError, ValueError, AttributeError):
+                pass
         elif match := re.search(r"added (\d+) new messages", line):
             job["new_messages"] = int(match[1])
             message = f"本次新增 {match[1]} 条消息。"

@@ -17,6 +17,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from .runtime import BusyError
 from .service import PROJECT, LocalService
+from .notes_api import notes_router
 
 
 class CaptureInput(BaseModel):
@@ -97,6 +98,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
     def status():
         groups = service.groups()
         return {"environment_ready": service.python.is_file() and (service.runtime / "node_modules").is_dir(),
+                "notes_environment_ready": service.notes_ready(), "notes_summary": service.notes.stats(),
                 "credential_saved": service.credential_saved(), "last_login": service.preferences.get("last_login"),
                 "last_login_attempt": service.preferences.get("last_login_attempt"),
                 "busy": service.runner.busy, "jobs": service.runner.list(), "groups": groups,
@@ -164,5 +166,6 @@ def create_app(data_root: Path | None = None) -> FastAPI:
     def index():
         return FileResponse(PROJECT / "webapp" / "static" / "index.html")
 
+    app.include_router(notes_router(service))
     app.mount("/static", StaticFiles(directory=PROJECT / "webapp" / "static"), name="static")
     return app

@@ -105,3 +105,10 @@ def test_reply_pagination_error_is_not_reported_as_complete():
             return {"has_more": False}
     with pytest.raises(NotesFailure, match="notes_response"):
         asyncio.run(fetch_replies(Client(), NOTE, "token", [{"id":"root","reply_count":1}], 10, delay=0))
+
+
+def test_malformed_reply_cannot_overwrite_its_root_comment():
+    from integration.notes_extra import NotesFailure
+    root = {"id":"root","reply_count":1,"_sub_comments":[{"id":"root","content":"invalid"}],"_sub_has_more":False}
+    with pytest.raises(NotesFailure, match="notes_response"):
+        asyncio.run(fetch_replies(object(), NOTE, "token", [root], 10, delay=0))

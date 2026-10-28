@@ -86,3 +86,22 @@ def test_more_than_ten_enabled_monitors_are_rejected(tmp_path):
         else:
             with pytest.raises(ValueError):
                 service.notes.set_monitor(note_id, True, 5, 20, False, 20)
+
+
+def test_note_database_lock_does_not_stop_group_scheduler(tmp_path, monkeypatch):
+    import sqlite3
+    service = LocalService(tmp_path)
+    def locked():
+        raise sqlite3.OperationalError("database is locked")
+    monkeypatch.setattr(service.note_schedule, "tick", locked)
+    calls = []
+    monkeypatch.setattr(service, "capture", lambda *args: calls.append(args))
+    service.monitor.update(enabled=True, group_id="123", next_run=0)
+    class OneTick:
+        count = 0
+        def wait(self, seconds):
+            self.count += 1
+            return self.count > 1
+    service.stop_event = OneTick()
+    service._schedule_loop()
+    assert calls and calls[0][0] == "123"

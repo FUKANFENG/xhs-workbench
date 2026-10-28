@@ -30,6 +30,7 @@ def comment_row(item, parent_id=""):
 
 async def fetch_replies(client, note_id, token, roots, limit, delay=1.2):
     replies, requests = {}, 0
+    root_ids = {root["id"] for root in roots}
     for root in roots:
         embedded = root.get("_sub_comments") or []
         if not isinstance(embedded, list):
@@ -38,6 +39,8 @@ async def fetch_replies(client, note_id, token, roots, limit, delay=1.2):
             continue
         for item in embedded:
             row = comment_row(item, root["id"])
+            if row["id"] in root_ids:
+                raise NotesFailure("notes_response")
             if row["id"] not in replies and len(replies) >= limit:
                 return list(replies.values()), False
             replies[row["id"]] = row
@@ -60,6 +63,8 @@ async def fetch_replies(client, note_id, token, roots, limit, delay=1.2):
                 raise NotesFailure("notes_response")
             for item in response["comments"]:
                 row = comment_row(item, root["id"])
+                if row["id"] in root_ids:
+                    raise NotesFailure("notes_response")
                 if row["id"] not in replies and len(replies) >= limit:
                     return list(replies.values()), False
                 replies[row["id"]] = row

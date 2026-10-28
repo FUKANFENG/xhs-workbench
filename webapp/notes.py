@@ -1,6 +1,5 @@
 """Local note storage shared by the web server and isolated capture worker."""
 
-import json
 import re
 import sqlite3
 import time
@@ -79,7 +78,7 @@ class NotesStore:
             values.update(id=note_id, updated_at=time.time(), detailed=int(detailed or bool(old and old["detailed"])),
                           source_keyword=keyword or (old["source_keyword"] if old else ""),
                           xsec_token=token or (old["xsec_token"] if old else ""),
-                          xsec_source=source or (old["xsec_source"] if old else "pc_search"))
+                          xsec_source=(source or "pc_search") if token or not old else old["xsec_source"])
             names = list(values)
             assignments = ",".join(f"{key}=excluded.{key}" for key in names if key != "id")
             db.execute(f"INSERT INTO notes ({','.join(names)}) VALUES ({','.join('?' for _ in names)}) "
@@ -151,7 +150,7 @@ class NotesStore:
             args.append(search)
         return (" WHERE " + " AND ".join(clauses) if clauses else ""), args
 
-    def export_rows(self, dataset, note_id=""):
+    def export_rows(self, dataset, note_id="", search=""):
         if note_id:
             self.get(note_id)
         with self.connect() as db:
@@ -160,8 +159,11 @@ class NotesStore:
                 args = [note_id] if note_id else []
                 if note_id:
                     query += " WHERE id=?"
+                if search:
+                    query += (" AND " if note_id else " WHERE ") + "instr(lower(title || ' ' || description || ' ' || author || ' ' || source_keyword),lower(?))>0"
+                    args.append(search)
             elif dataset == "comments":
-                where, args = self.comment_filter(note_id, "")
+                where, args = self.comment_filter(note_id, search)
                 query = "SELECT " + ",".join("c." + key for key in COMMENT_FIELDS) + " FROM comments c" + where
             else:
                 raise ValueError("不支持的导出类型。")

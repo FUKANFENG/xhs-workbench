@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light"><title>笔记与评论 · 小红书工作台</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/notes.css">
+  <script src="/static/notes.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#content">跳到内容</a>
+<aside class="sidebar">
+  <a class="brand" href="/#workspace"><span class="brand-mark">书</span><span>小红书工作台<small>记录 · 笔记 · 评论</small></span></a>
+  <nav aria-label="主导航">
+    <a class="nav-link" href="/#workspace"><span aria-hidden="true">▦</span> 群记录工作台</a>
+    <a class="nav-link" href="/notes" id="nav-notes"><span aria-hidden="true">▤</span> 笔记采集</a>
+    <a class="nav-link" href="/comments" id="nav-comments"><span aria-hidden="true">◌</span> 评论管理</a>
+  </nav>
+  <div class="sidebar-note"><span class="local-dot"></span> 仅在这台电脑运行<p>共用扫码登录<br>采集结果保存在本机</p></div>
+</aside>
+<main id="content">
+  <header class="topbar"><span class="eyebrow">XHS LOCAL WORKSPACE</span><a id="account-state" class="badge neutral" href="/#workspace">正在检查登录…</a></header>
+  <section class="page-intro"><div><p class="eyebrow red">查找 / 收集 / 阅读</p><h1 id="page-title">笔记采集</h1><p id="page-description">从一个关键词或一篇笔记开始，把有用的内容留在本机。</p></div><span class="version">LOCAL · 1.1</span></section>
+  <section class="stats" aria-label="笔记与评论概览">
+    <div><span>本地笔记</span><strong id="notes-count">0</strong><small>搜索摘要与完整详情</small></div>
+    <div><span>已保存一级评论</span><strong id="comments-count">0</strong><small>按评论编号去重合并</small></div>
+    <div><span>采集状态</span><strong class="stat-word" id="capture-state">准备就绪</strong><small>与群记录共用任务队列</small></div>
+  </section>
+  <p id="setup-warning" class="notice" role="status" hidden></p>
+  <div id="note-inputs" class="note-inputs">
+    <section class="panel"><div class="panel-heading"><div><span class="step">01</span><h2>关键词搜索</h2></div><span class="subtle">先看摘要，再选取详情</span></div>
+      <form id="note-search-form">
+        <label for="keyword">想查找什么</label><input id="keyword" required maxlength="100" placeholder="例如：Python 入门、旅行攻略" autocomplete="off">
+        <div class="form-grid"><div><label for="note-sort">排序方式</label><select id="note-sort"><option value="general">综合排序</option><option value="time_descending">最新发布</option><option value="popularity_descending">最受欢迎</option></select></div><div><label for="note-limit">本次最多保存</label><select id="note-limit"><option value="5">5 篇</option><option value="10">10 篇</option><option value="20" selected>20 篇</option><option value="40">40 篇</option></select></div></div>
+        <button id="search-submit" class="button primary" type="submit" disabled>搜索并保存摘要 <span aria-hidden="true">↗</span></button>
+      </form>
+    </section>
+    <section class="panel"><div class="panel-heading"><div><span class="step">02</span><h2>按链接采集</h2></div></div>
+      <form id="note-link-form"><label for="note-url">笔记链接或分享文案</label><textarea id="note-url" required maxlength="4096" rows="2" placeholder="粘贴完整笔记链接或 xhslink.com 分享链接"></textarea>
+        <div class="note-limit-row"><div><label for="comment-limit">一级评论上限</label><select id="comment-limit"><option value="0">只保存笔记详情</option><option value="20">20 条</option><option value="100" selected>100 条</option><option value="500">500 条</option></select></div><button id="link-submit" class="button" type="submit" disabled>采集详情与评论</button></div>
+        <p class="field-hint">上限也用于下方笔记的采集操作。暂不展开二级回复，不下载图片和视频文件。</p>
+      </form>
+    </section>
+  </div>
+  <section class="panel note-task" aria-label="当前采集任务"><div class="section-label">最近任务 <button id="cancel-note-job" class="text-button danger" hidden>取消任务</button></div><div id="note-job" class="job-status" role="status" aria-live="polite"><span class="job-icon" aria-hidden="true">↳</span><div><strong>准备就绪</strong><p>任务进度和结果会显示在这里。</p></div></div></section>
+  <section class="panel notes-records" aria-labelledby="list-title">
+    <div class="panel-heading"><div><h2 id="list-title">本地笔记</h2><span id="list-total" class="badge neutral">0 篇</span></div><a id="all-comments" class="text-button" href="/comments" hidden>查看全部评论 ↗</a></div>
+    <div id="comment-scope" class="comment-scope" hidden><div><strong id="scope-title"></strong><p id="scope-status" class="field-hint"></p></div><a class="text-button" href="/comments">清除笔记筛选</a></div>
+    <div class="records-toolbar note-toolbar"><div class="search-box"><label class="sr-only" for="local-filter">搜索本地记录</label><span aria-hidden="true">⌕</span><input id="local-filter" type="search" maxlength="200" placeholder="搜索本地标题、正文或作者"></div>
+      <div id="comment-refresh" class="comment-refresh" hidden><label class="sr-only" for="refresh-limit">刷新一级评论上限</label><select id="refresh-limit"><option value="20">最多 20 条</option><option value="100" selected>最多 100 条</option><option value="500">最多 500 条</option></select><button id="refresh-comments" class="button small" disabled>刷新一级评论</button></div>
+      <div class="download-actions"><button id="export-notes-csv" class="button small" disabled>导出 CSV</button><button id="export-notes-json" class="button small" disabled>导出 JSON</button></div>
+    </div>
+    <p id="list-error" class="notice" role="alert" hidden></p>
+    <div id="note-empty" class="empty-state"><span class="empty-icon" aria-hidden="true">▤</span><h3 id="empty-title">还没有本地笔记</h3><p id="empty-description">搜索关键词保存摘要，或粘贴笔记链接采集完整内容。</p></div>
+    <div id="notes-list" class="notes-list" aria-live="polite"></div>
+    <div id="notes-pagination" class="pagination" hidden><span id="notes-page-count"></span><div><button id="notes-prev" class="button small">上一页</button><span id="notes-page-label"></span><button id="notes-next" class="button small">下一页</button></div></div>
+  </section>
+  <section class="guide"><h2>关于这些记录</h2><div class="guide-grid"><div><strong>摘要与详情分开标记</strong><p>搜索结果保存的是摘要。选择“采集详情”后，才会保存正文并按上限获取一级评论。</p></div><div><strong>刷新会保留旧记录</strong><p>重复评论会合并更新，过去保存的内容不会因本次未返回而删除。页面会注明本次是否读到分页末尾。</p></div><div><strong>连接状态可随时查看</strong><p>与群记录共用扫码凭据。登录过期时，点击右上角连接状态返回工作台重新扫码。</p></div></div></section>
+  <footer>笔记采集使用 MediaCrawler · 非商业学习使用许可证 1.1 · 保留上游版权与许可</footer>
+</main>
+<dialog id="note-detail" aria-labelledby="detail-title"><div class="detail-header"><div><span class="eyebrow red" id="detail-kind">本地笔记</span><h2 id="detail-title">笔记详情</h2></div><button id="close-detail" class="button small" aria-label="关闭笔记详情">关闭</button></div><p id="detail-meta" class="description"></p><p id="detail-summary" class="notice" hidden></p><div id="detail-body" class="detail-body"></div><div class="detail-actions"><button id="detail-capture" class="button primary">采集详情与评论</button><a id="detail-comments" class="button" href="/comments">查看已保存评论</a><a id="detail-original" class="text-button" target="_blank" rel="noopener noreferrer">打开原笔记 ↗</a></div></dialog>
+<div id="toast" class="toast" role="alert" hidden></div>
+</body></html>

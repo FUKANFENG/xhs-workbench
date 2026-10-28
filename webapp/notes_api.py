@@ -23,8 +23,8 @@ class NoteJobInput(BaseModel):
     max_comments: int = Field(default=100, ge=0, le=500)
 
 
-def export_stream(store, dataset, kind, note_id):
-    rows = store.export_rows(dataset, note_id)
+def export_stream(store, dataset, kind, note_id, search=""):
+    rows = store.export_rows(dataset, note_id, search)
     if kind == "json":
         yield '{"dataset":' + json.dumps(dataset) + ',"items":['
         separator = ""
@@ -69,11 +69,12 @@ def notes_router(service):
         return service.notes.comments(note_id, search, page, size)
 
     @router.get("/api/notes/export")
-    def export(dataset: Literal["notes", "comments"], kind: Literal["csv", "json"], note_id: str = ""):
+    def export(dataset: Literal["notes", "comments"], kind: Literal["csv", "json"], note_id: str = "",
+               search: str = Query(default="", max_length=200)):
         if note_id:
             service.notes.get(note_id)
         filename = f"xhs-{dataset}{'-' + note_id if note_id else ''}.{kind}"
-        return StreamingResponse(export_stream(service.notes, dataset, kind, note_id),
+        return StreamingResponse(export_stream(service.notes, dataset, kind, note_id, search),
                                  media_type="application/json" if kind == "json" else "text/csv",
                                  headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 

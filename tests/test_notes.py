@@ -12,7 +12,7 @@ NOTE = "1234567890abcdef12345678"
 def test_search_refresh_preserves_full_note_and_exports_never_include_access_token(tmp_path):
     store = NotesStore(tmp_path)
     store.save_note({"id": NOTE, "title": "完整笔记", "description": "完整正文"},
-                    token="PRIVATE_ACCESS", detailed=True)
+                    token="PRIVATE_ACCESS", source="pc_feed", detailed=True)
     store.save_note({"id": NOTE, "title": "搜索摘要", "description": "短摘要"}, keyword="Python")
     note = store.get(NOTE)
     assert note["title"] == "完整笔记"
@@ -20,6 +20,7 @@ def test_search_refresh_preserves_full_note_and_exports_never_include_access_tok
     assert note["detailed"] is True
     assert store.list_notes()["total"] == 1
     assert store.access(NOTE)["token"] == "PRIVATE_ACCESS"
+    assert store.access(NOTE)["source"] == "pc_feed"
     assert "PRIVATE_ACCESS" not in json.dumps(list(store.export_rows("notes")))
     assert "xsec_token" not in json.dumps(note)
 

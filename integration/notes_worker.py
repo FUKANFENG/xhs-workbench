@@ -236,6 +236,9 @@ def main():
     parser.add_argument("--data", type=Path, required=True)
     parser.add_argument("--request", type=Path, required=True)
     args = parser.parse_args()
+    args.runtime = args.runtime.resolve()
+    args.data = args.data.resolve()
+    args.request = args.request.resolve()
     try:
         asyncio.run(run(args))
         return 0

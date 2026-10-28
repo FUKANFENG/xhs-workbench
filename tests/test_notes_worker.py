@@ -45,3 +45,37 @@ def test_repeated_cursor_does_not_loop_forever():
             return {"comments": [], "has_more": True, "cursor": "same"}
     with pytest.raises(NotesFailure, match="notes_pagination"):
         asyncio.run(fetch_comments(Client(), NOTE, "secret", 20, delay=0))
+
+
+def test_short_link_cannot_redirect_to_local_network(monkeypatch):
+    import asyncio
+    import httpx
+    from integration.notes_worker import resolve_note_url
+    calls = []
+    class Client:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def get(self, url):
+            calls.append(url)
+            return httpx.Response(302, headers={"location": "http://127.0.0.1:8777/api/bootstrap"})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: Client())
+    with pytest.raises(ValueError):
+        asyncio.run(resolve_note_url("https://xhslink.com/a/example"))
+    assert calls == ["https://xhslink.com/a/example"]
+
+
+def test_short_link_resolves_allowed_note_without_sending_cookies(monkeypatch):
+    import asyncio
+    import httpx
+    from integration.notes_worker import resolve_note_url
+    class Client:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, *args):
+            pass
+        async def get(self, url):
+            return httpx.Response(302, headers={"location": "https://www.xiaohongshu.com/discovery/item/" + NOTE + "?xsec_token=EXAMPLE"})
+    monkeypatch.setattr(httpx, "AsyncClient", lambda **kwargs: Client())
+    assert asyncio.run(resolve_note_url("https://xhslink.com/a/example")) == (NOTE, "EXAMPLE", "pc_search")

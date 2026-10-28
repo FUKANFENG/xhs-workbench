@@ -34,6 +34,8 @@ def test_note_and_comment_apis_are_paged_and_export_safe(browser):
     exported = client.get("/api/notes/export?dataset=notes&kind=json")
     assert exported.json()["items"][0]["title"] == "=危险公式"
     assert "PRIVATE_TOKEN" not in exported.text
+    assert client.get("/api/notes/export?dataset=notes&kind=json&search=不存在").json()["items"] == []
+    assert client.get("/api/notes/export?dataset=comments&kind=json&search=不存在").json()["items"] == []
     assert client.get("/api/notes/export?dataset=cookie&kind=json").status_code == 422
     assert client.get("/api/notes?size=100000").status_code == 422
     assert client.get("/api/notes", headers={"X-Local-Token": "wrong"}).status_code == 403
@@ -61,5 +63,8 @@ def test_note_jobs_validate_inputs_and_share_runner(browser, monkeypatch):
     assert client.post("/api/notes/jobs", json={"mode": "search", "keyword": "  "}).status_code == 400
     assert client.post("/api/notes/jobs", json={"mode": "search", "keyword": "x", "max_notes": 500}).status_code == 422
     assert client.post("/api/notes/jobs", json={"mode": "comments", "note_id": NOTE, "max_comments": 0}).status_code == 400
+    service.runner.active_id = "other-task"
+    assert client.post("/api/notes/jobs", json={"mode": "search", "keyword": "Python"}).status_code == 409
+    service.runner.active_id = None
     service.finished({"id": "test-job", "kind": "notes_search", "status": "succeeded"})
     assert not request_file.exists()

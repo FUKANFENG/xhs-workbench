@@ -2,6 +2,7 @@
 **
 !Dockerfile
 !requirements-lock.txt
+!requirements-publish.lock
 !LICENSE
 !THIRD_PARTY_NOTICES.md
 !docker/

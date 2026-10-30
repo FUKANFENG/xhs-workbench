@@ -1,5 +1,6 @@
-"""Build two pinned, separate runtimes; runs only during Docker image creation."""
+"""Build three pinned, separate runtimes; runs only during Docker image creation."""
 import subprocess
+import shutil
 import sys
 from pathlib import Path
 
@@ -28,3 +29,9 @@ media = checkout('MediaCrawler', 'https://github.com/NanmiCoder/MediaCrawler.git
 run('uv', 'sync', '--frozen', '--no-dev', '--python', sys.executable, '--project', media)
 run(spider / '.venv/bin/python', '-c', 'from apis.xhs_pc_login_apis import XHSLoginApi; from apis.xhs_live import XHSLiveAPI', cwd=spider)
 run(media / '.venv/bin/python', '-c', 'from media_platform.xhs.client import XiaoHongShuClient', cwd=media)
+publisher = checkout('SocialAutoUpload', 'https://github.com/dreammis/social-auto-upload.git',
+                     '3847fff01f5434a8a32829833163cd6723cabc59')
+run(sys.executable, '-m', 'venv', publisher / '.venv')
+run(publisher / '.venv/bin/python', '-m', 'pip', 'install', '--no-cache-dir', '-r', '/build/requirements-publish.lock')
+shutil.copyfile(publisher / 'conf.example.py', publisher / 'conf.py')
+run(publisher / '.venv/bin/python', '-c', 'import patchright.async_api')

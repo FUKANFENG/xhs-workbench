@@ -1,7 +1,7 @@
 name: xhs-workbench
 services:
   web:
-    image: xhs-workbench:1.2.0
+    image: xhs-workbench:1.3.0
     build:
       context: .
       target: runtime
@@ -13,7 +13,8 @@ services:
       - xhs-data:/data
     read_only: true
     tmpfs:
-      - /tmp:size=256m,mode=1777
+      - /tmp:size=512m,mode=1777
+    shm_size: 256m
     cap_drop:
       - ALL
     security_opt:

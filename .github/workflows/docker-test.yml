@@ -2,9 +2,9 @@ name: Docker build and tests
 on:
   push:
     branches: [main]
-    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", ".github/workflows/docker-test.yml"]
+    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", "requirements-publish.lock", ".github/workflows/docker-test.yml"]
   pull_request:
-    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", ".github/workflows/docker-test.yml"]
+    paths: ["Dockerfile", "compose.yaml", "docker/**", "webapp/**", "integration/**", "skills/**", "tests/**", "requirements-lock.txt", "requirements-publish.lock", ".github/workflows/docker-test.yml"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -37,9 +37,11 @@ jobs:
             if (-not $ready) { docker logs xhs-ci; throw 'Health check failed.' }
             $bootstrap = Invoke-RestMethod http://127.0.0.1:8779/api/bootstrap
             $state = Invoke-RestMethod http://127.0.0.1:8779/api/status -Headers @{'X-Local-Token'=$bootstrap.token}
-            if (-not $state.environment_ready -or -not $state.notes_environment_ready -or $state.credential_saved) {
+            if (-not $state.environment_ready -or -not $state.notes_environment_ready -or -not $state.publishing.environment_ready -or $state.credential_saved -or $state.publishing.credential_saved) {
               throw 'Unexpected runtime state or credentials present in image.'
             }
+            docker exec xhs-ci /opt/runtimes/SocialAutoUpload/.venv/bin/python /app/docker/browser_smoke.py
+            if ($LASTEXITCODE -ne 0) { throw 'Non-root browser startup failed.' }
           } finally {
             docker rm -f xhs-ci
             docker volume rm xhs-ci-data

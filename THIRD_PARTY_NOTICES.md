@@ -1,5 +1,13 @@
 # 第三方组件
 
+## social-auto-upload（发布适配器）
+
+来源：https://github.com/dreammis/social-auto-upload
+
+固定版本：3847fff01f5434a8a32829833163cd6723cabc59。MIT License，Copyright (c) 2023 dreammis。完整上游源码和 LICENSE 保留在 `runtime/SocialAutoUpload`（Docker 中为 `/opt/runtimes/SocialAutoUpload`）。本项目调用其小红书登录和内容填写方法；本地适配器独立处理超时、一次提交及结果核对。
+
+发布使用 Patchright 1.58.2（Apache-2.0）及其 Chromium 浏览器。Python 依赖固定在 `requirements-publish.lock`，运行环境保留第三方包的许可证；Chromium 保留发行包内的第三方许可文件。新增发布组件的许可不会改变下述采集组件的使用限制。
+
 ## xhs-group-chat-insights
 
 来源：https://github.com/q741242673/xhs-group-chat-insights

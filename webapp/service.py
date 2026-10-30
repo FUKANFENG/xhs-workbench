@@ -17,6 +17,7 @@ from zoneinfo import ZoneInfo
 from .runtime import BusyError, JobRunner
 from .notes import NotesStore, valid_note_id
 from .note_schedule import NoteSchedule
+from .publishing import Publishing
 
 PROJECT = Path(__file__).resolve().parent.parent
 SCRIPTS = PROJECT / "skills" / "xhs-group-chat-insights" / "scripts"
@@ -60,6 +61,7 @@ class LocalService:
         self.media_python = self.media_root / ".venv" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
         self.note_requests: dict[str, Path] = {}
         self.note_schedule = NoteSchedule(self)
+        self.publishing = Publishing(self)
 
     def notes_ready(self):
         return self.media_python.is_file() and (self.media_root / "media_platform/xhs/client.py").is_file()
@@ -196,6 +198,9 @@ class LocalService:
 
     def finished(self, job: dict) -> None:
         with self.lock:
+            if job["kind"].startswith("publish_"):
+                self.publishing.finished(job)
+                return
             if job["kind"].startswith("notes_"):
                 self.note_schedule.finished(job)
                 path = self.note_requests.pop(job["id"], None)

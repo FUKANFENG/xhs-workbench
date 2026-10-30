@@ -18,6 +18,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from .runtime import BusyError
 from .service import PROJECT, LocalService
 from .notes_api import notes_router
+from .publish_api import publish_router
 
 
 class CaptureInput(BaseModel):
@@ -93,7 +94,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
 
     @app.get("/api/bootstrap")
     def bootstrap():
-        return {"token": token, "app_name": "小红书工作台", "version": "本地版 1.2"}
+        return {"token": token, "app_name": "小红书工作台", "version": "本地版 1.3"}
 
     @app.get("/api/status")
     def status():
@@ -101,6 +102,7 @@ def create_app(data_root: Path | None = None) -> FastAPI:
         return {"environment_ready": service.python.is_file() and (service.runtime / "node_modules").is_dir(),
                 "notes_environment_ready": service.notes_ready(), "notes_summary": service.notes.stats(),
                 "credential_saved": service.credential_saved(), "last_login": service.preferences.get("last_login"),
+                "publishing": service.publishing.status(),
                 "last_login_attempt": service.preferences.get("last_login_attempt"),
                 "busy": service.runner.busy, "jobs": service.runner.list(), "groups": groups,
                 "monitor": dict(service.monitor), "total_messages": sum(group["count"] for group in groups)}
@@ -173,5 +175,10 @@ def create_app(data_root: Path | None = None) -> FastAPI:
         return FileResponse(PROJECT / "webapp" / "static" / "notes.html")
 
     app.include_router(notes_router(service))
+    @app.get("/publish")
+    def publish_page():
+        return FileResponse(PROJECT / "webapp" / "static" / "publish.html")
+
+    app.include_router(publish_router(service))
     app.mount("/static", StaticFiles(directory=PROJECT / "webapp" / "static"), name="static")
     return app

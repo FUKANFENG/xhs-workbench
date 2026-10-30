@@ -50,6 +50,20 @@ def login_error(diagnostic: dict) -> str:
 def public_error(line: str) -> str:
     """Translate expected CLI errors without returning credentials or traces."""
     value = line.lower()
+    publish_errors = {
+        "publish_auth": "发布登录已失效或未授权，请在发布页面重新扫码。",
+        "publish_runtime": "发布环境版本不匹配，请重新运行 Install-Publish.ps1。",
+        "publish_login": "创作者中心扫码登录未完成，旧登录信息仍保留。",
+        "publish_uncertain": "提交结果尚未确认，请核对作品记录；不会自动重发。",
+        "publish_verify": "无法读取创作者中心作品记录，请稍后重新核对。",
+        "publish_frozen": "这个草稿已冻结，不能再次提交。",
+        "publish_media": "发布素材缺失，请重新上传。",
+        "publish_tags": "部分话题未匹配，尚未提交；请修改话题后再试。",
+        "publish_not_ready": "上传或内容检查尚未完成，任务已停止，没有提交。",
+        "publish_failed": "发布任务未完成，请查看草稿状态；待核对的提交不会自动重发。",
+    }
+    if value.removeprefix("error=") in publish_errors:
+        return publish_errors[value.removeprefix("error=")]
     note_errors = {
         "notes_auth": "登录已失效或访问被拒绝，请重新扫码后再试。",
         "notes_blocked": "平台限制了本次请求，任务已停止，请稍后再试。",
@@ -154,6 +168,16 @@ class JobRunner:
                            "replies_limited": f"已合并 {count} 条回复，达到本次回复上限。",
                            "creator": "正在读取作者作品列表。", "creator_saved": f"已保存 {count} 篇作者作品摘要。",
                            "media": f"已保存 {count} 个媒体文件。", "media_saved": f"已保存 {count} 个媒体文件，可在笔记详情中预览或下载。"}.get(event.get("stage"))
+            except (TypeError, ValueError, AttributeError):
+                pass
+        elif line.startswith("publish_progress="):
+            try:
+                stage = json.loads(line.split("=", 1)[1]).get("stage")
+                message = {"login": "正在准备创作者中心登录。", "qr": "请扫码并在手机上确认创作者中心登录。",
+                           "logged_in": "发布登录成功，独立会话已保存。", "auth": "正在检查发布登录状态。",
+                           "checked": "发布登录已实时验证。", "uploading": "正在上传发布素材。",
+                           "metadata": "正在填写标题、正文与话题。", "submitting": "已开始提交，正在等待平台处理；不会重复提交。",
+                           "verifying": "正在核对创作者中心作品记录。", "published": "已核实作品记录，审核及可见状态以平台为准。"}.get(stage)
             except (TypeError, ValueError, AttributeError):
                 pass
         elif match := re.search(r"added (\d+) new messages", line):

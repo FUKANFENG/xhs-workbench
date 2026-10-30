@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="color-scheme" content="light"><title>内容发布 · 小红书工作台</title>
+<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/publish.css">
+<script src="/static/publish.js" defer></script></head><body>
+<a class="skip-link" href="#content">跳到内容</a>
+<aside class="sidebar"><a class="brand" href="/#workspace"><span class="brand-mark">书</span><span>小红书工作台<small>LOCAL WORKBENCH</small></span></a>
+<nav aria-label="工作台导航"><a class="nav-link" href="/#workspace"><span aria-hidden="true">▦</span> 群记录工作台</a><a class="nav-link" href="/notes"><span aria-hidden="true">▤</span> 笔记采集</a><a class="nav-link" href="/comments"><span aria-hidden="true">◌</span> 评论管理</a><a class="nav-link active" href="/publish" aria-current="page"><span aria-hidden="true">↗</span> 内容发布</a></nav>
+<div class="sidebar-note"><span class="local-dot"></span>数据保存在本机<p>采集和发布分别登录。<br>草稿保存后，由你确认发布。</p></div></aside>
+<main id="content"><header class="topbar"><span class="eyebrow">XIAOHONGSHU / PUBLISH</span><span id="auth-badge" class="badge neutral">正在读取连接状态</span></header>
+<section class="page-intro"><div><p class="eyebrow red">CREATE &amp; PUBLISH</p><h1>把内容准备好，再发布。</h1><p>图片、视频和文字集中整理，提交后可在这里查看结果。</p></div><button id="new-draft" class="button">新建草稿</button></section>
+<p id="setup-warning" class="notice" hidden>发布环境尚未安装。请运行项目中的 Install-Publish.ps1，然后重启工作台。</p>
+<section class="panel publish-connection" aria-labelledby="connection-heading"><div><h2 id="connection-heading">发布账号</h2><p class="description">使用小红书 App 扫码登录创作者中心，与采集账号的登录分别保存。</p><p id="checked-at" class="description"></p></div><div class="publish-buttons"><button id="check-auth" class="button">检查登录</button><button id="login" class="button primary">扫码登录</button></div><div id="login-panel" class="publish-qr" hidden><img id="login-qr" alt="小红书创作者中心登录二维码" width="168" height="168"><p>请用手机小红书扫码，并确认登录创作者中心。</p></div></section>
+<section id="job-panel" class="panel publish-job" aria-live="polite" hidden><div><h2 id="job-title">正在执行任务</h2><p id="job-message" class="description"></p></div><button id="cancel-job" class="button small">停止任务</button></section>
+<div class="publish-layout"><section class="panel publish-editor" aria-labelledby="editor-heading"><div class="section-heading"><div><span class="eyebrow red">01 / PREPARE</span><h2 id="editor-heading">准备发布内容</h2></div><span id="draft-state" class="badge neutral">新草稿</span></div>
+<form id="draft-form"><fieldset id="draft-fields"><div class="publish-form-row"><div><label for="kind">内容类型</label><select id="kind"><option value="image">图文笔记</option><option value="video">视频笔记</option></select></div><div class="publish-title-field"><label for="title">标题 <span id="title-count" class="optional">0 / 20</span></label><input id="title" maxlength="20" required placeholder="给这篇笔记写个标题"></div></div>
+<label for="body">正文 <span class="optional">可选</span></label><textarea id="body" rows="8" maxlength="1000" placeholder="写下你想分享的内容"></textarea><p id="body-count" class="field-hint">0 / 1000 字</p>
+<label for="tags">话题 <span class="optional">可选，最多 10 个</span></label><input id="tags" maxlength="220" placeholder="用逗号分隔，例如：日常记录，学习分享"><p class="field-hint">正文与话题合计不超过 1000 字。未匹配的话题会中止提交，修改后可重试。</p>
+<label for="media-files">图片素材</label><input id="media-files" type="file" accept=".jpg,.jpeg,.png,.webp" multiple><p id="media-hint" class="field-hint">最多 9 张 JPEG、PNG 或 WebP，每张不超过 20 MB。选择后保存到当前草稿。</p>
+<div id="assets" class="publish-assets"></div><button id="save-draft" class="button" type="submit">保存草稿</button></fieldset></form>
+<div class="publish-submit"><div><h3>确认内容后发布</h3><p id="draft-message" class="description">保存草稿并上传素材后，即可提交。</p></div><div class="publish-buttons"><button id="verify-result" class="button" hidden>核对发布结果</button><button id="submit-publish" class="button primary" disabled>确认发布</button></div></div></section>
+<aside class="panel publish-history" aria-labelledby="history-heading"><div class="section-heading"><div><span class="eyebrow">02 / HISTORY</span><h2 id="history-heading">草稿与发布记录</h2></div><button id="refresh" class="text-button">刷新</button></div><p id="history-empty" class="description">还没有草稿。填写左侧内容开始准备。</p><div id="history" class="publish-history-list"></div></aside></div>
+<section class="guide publish-guide"><h2>关于发布结果</h2><p>任务与采集串行执行。提交后若暂时无法确认，会标记为“待核对”，不会自动重发。核实到作品记录后显示“已核实提交”；审核、推荐和公开可见状态以小红书平台为准。本页支持即时图文、视频发布。</p></section>
+<footer>小红书工作台 · 发布组件基于 social-auto-upload / MIT</footer></main>
+<dialog id="confirm-dialog" aria-labelledby="confirm-heading"><h2 id="confirm-heading">确认发布这篇笔记？</h2><p id="confirm-summary"></p><p class="description">确认后会将当前草稿和素材提交到已登录的小红书账号。</p><div class="publish-buttons"><button id="confirm-cancel" class="button">返回检查</button><button id="confirm-send" class="button primary">确认并提交</button></div></dialog>
+<div id="toast" class="toast" role="alert" hidden></div></body></html>
